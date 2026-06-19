@@ -1,0 +1,53 @@
+[project]
+name = "ropes"
+version = "0.1.0"
+description = "Remote file OPErations via Ssh"
+readme = "README.md"
+authors = [
+    { name = "bernik86", email = "44434852+bernik86@users.noreply.github.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "click>=8.4.0",
+    "fabric>=3.2.3",
+    "rich-click>=1.9.7",
+]
+
+[project.optional-dependencies]
+dev = [
+    "isort",
+    "black",
+    "pylint",
+    "pylint-venv",
+    "pycodestyle",
+    "pyflakes",
+    "mypy",
+]
+
+[project.scripts]
+ropes = "ropes.main:main"
+
+[tool.isort]
+profile = "black"
+multi_line_output = 7
+force_single_line = true
+
+[tool.black]
+line-length = 100
+target-version = ['py312']
+
+[tool.pylint.format]
+max-line-length = "100"
+
+[pycodestyle]
+max-line-length = 100
+
+[[tool.mypy.overrides]]
+module = "fabric"
+ignore_missing_imports = true
+
+[build-system]
+requires = ["uv_build>=0.10.11,<0.11.0"]
+build-backend = "uv_build"
+
+

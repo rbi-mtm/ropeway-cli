@@ -1,0 +1,192 @@
+```
+    ____  ____  ____  ___________
+   / __ \/ __ \/ __ \/ ____/ ___/
+  / /_/ / / / / /_/ / __/  \__ \
+ / _, _/ /_/ / ____/ /___ ___/ /
+/_/ |_|\____/_/   /_____//____/
+
+
+         Remote file OPErations via Ssh
+
+```
+
+# ROPES
+
+**ROPES** is a command-line tool for performing remote file operations over SSH.
+It uses [Fabric](https://www.fabfile.org/) under the hood and provides a
+convenient Click-based interface for common remote file tasks.
+
+## Features
+
+- **ls** — List remote directory contents
+- **view** — Fetch a remote file, edit it locally, and write it back
+- **get** / **put** — Download / upload files
+- **mkdir** — Create remote directories
+- **sync_cwd** — Bidirectional `rsync` between current directory and remote
+- **find** — Search for files on the remote host (uses [fd](https://github.com/sharkdp/fd) by default; falls back to `find`)
+- **realpath** — Resolve the absolute path of a remote file
+- **compress** — Compress remote files (bzip2, gzip, etc.)
+- **delete** — Remove a remote file (with confirmation)
+- **tail** — Tail a remote file (supports `-f`)
+- **cp** — Copy a file on the remote machine
+- **run** — Execute arbitrary commands on the remote host
+
+## Installation
+
+The package is not yet on PyPI.  Clone the repository and install
+from source.
+
+### Using `uv` (recommended)
+
+```bash
+git clone https://github.com/bernik86/ropes.git
+cd ropes
+uv venv
+source .venv/bin/activate
+uv pip install .
+```
+
+### Using `pip`
+
+```bash
+git clone https://github.com/bernik86/ropes.git
+cd ropes
+python3 -m venv .venv
+source .venv/bin/activate
+pip install .
+```
+
+After either method, the `ropes` command is available inside the virtual
+environment.
+
+## Configuration
+
+Create `~/.config/ropes/hosts.json` with one entry per remote host:
+
+```json
+{
+  "mycluster": {
+    "local_base_path": "/home/user/projects",
+    "remote_base_path": "/remote/home/user/projects",
+    "@mycommand": "some_remote_command --with-flags"
+  }
+}
+```
+
+| Key | Description |
+|---|---|
+| `local_base_path` | Base path on the local machine |
+| `remote_base_path` | Corresponding base path on the remote machine |
+| `@<name>` | Command alias (invoked via `run @<name>`) |
+
+## Usage
+
+```
+ropes -H <host> <command> [options] [args]
+```
+
+The `-H` / `--host` flag is **required** and must match a key in
+`hosts.json`.
+
+### Commands
+
+| Command | Description |
+|---|---|
+| `ls [PATH]` | List directory contents on the remote host |
+| `view PATH` | Fetch, edit locally, and optionally write back |
+| `get PATH` | Download a remote file |
+| `put PATH` | Upload a local file |
+| `mkdir [PATH]` | Create a directory on the remote host |
+| `sync_cwd` | Sync current directory to/from remote via `rsync` |
+| `find [EXPR]` | Search for files on [fd](https://github.com/sharkdp/fd) (default) or `find` backends. Supports `--use`, `--args`, `--full-path`, `--show-type` |
+| `realpath PATH` | Resolve the absolute remote path |
+| `compress` | Compress files in a remote directory |
+| `delete PATH` | Delete a remote file (prompts for confirmation) |
+| `tail FILENAME` | Tail a remote file |
+| `cp SRC DEST` | Copy a file on the remote machine |
+| `run CMD` | Run an arbitrary command or `@alias` on the remote host |
+
+### Examples
+
+```bash
+# List remote directory
+ropes -H mycluster ls /remote/path
+
+# Edit a remote file locally and write changes back
+ropes -H mycluster view /remote/path/file.txt --write
+
+# Create a new file on the remote host
+ropes -H mycluster view /remote/path/new.txt --new
+
+# Download a file
+ropes -H mycluster get /remote/path/file.txt
+
+# Upload a file
+ropes -H mycluster put /local/path/file.txt
+
+# Sync current directory to remote
+ropes -H mycluster sync_cwd
+
+# Sync from remote to local
+ropes -H mycluster sync_cwd --from
+
+# Find Python files (uses fd by default; install fd on the remote host)
+# See https://github.com/sharkdp/fd
+ropes -H mycluster find -e py
+ropes -H mycluster find -e py --full-path --show-type
+
+# Use find backend explicitly
+ropes -H mycluster find --use find --args "-maxdepth 3 -name '*.py'"
+
+# Compress files with gzip, excluding images
+ropes -H mycluster compress --use gzip --exclude "*png *jpg"
+
+# Tail a remote log
+ropes -H mycluster tail /remote/path/log.txt
+ropes -H mycluster tail -f /remote/path/log.txt
+
+# Copy a file on the remote host
+ropes -H mycluster cp /remote/path/file.txt /remote/path/file.bak
+
+# Run a command or alias
+ropes -H mycluster run "ls -la /tmp"
+ropes -H mycluster run @mycommand
+```
+
+## Path Mapping
+
+ROPES automatically translates paths between local and remote machines.
+When a **relative** path is given, `local_base_path` in the current working
+directory is replaced by `remote_base_path` (or vice versa).  Absolute
+paths are used as-is.
+
+For example, with the config above:
+- `ropes -H mycluster ls .` from `/home/user/projects/foo` lists
+  `/remote/home/user/projects/foo` on the remote host.
+- `ropes -H mycluster get /remote/home/user/projects/foo/bar.txt` saves
+  the file locally as `/home/user/projects/foo/bar.txt`.
+
+## Development
+
+```bash
+git clone https://github.com/bernik86/ropes.git
+cd ropes
+python3 -m venv .venv
+source .venv/bin/activate
+uv sync
+
+# Lint / format
+uv run isort src/
+uv run black src/
+uv run pylint src/
+uv run mypy src/
+```
+
+## License
+
+Copyright (C) 2026 Berni
+
+This program is free software; you can redistribute it and/or modify it
+under the terms of the GNU General Public License as published by the
+Free Software Foundation; either version 3 of the License, or (at your
+option) any later version.
