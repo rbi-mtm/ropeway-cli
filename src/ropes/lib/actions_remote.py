@@ -86,8 +86,6 @@ def remote_fetch(
     Raises:
         FileNotFoundError: The remote file does not exist, or the local
             temporary file was not created after the download.
-        ValueError: The remote path could not be resolved (no base path
-            configured).
     """
     remote_path = _construct_path(path, host_conf)
 
@@ -97,8 +95,6 @@ def remote_fetch(
         raise FileNotFoundError(
             f"Could not find file {remote_path} on host {host_conf["hostname"]}"
         ) from exc
-    except ValueError as exc:
-        raise ValueError("Path for remote job database not set!") from exc
 
     if not os.path.isfile(temp_path):
         raise FileNotFoundError(f"Temporary file not found: {temp_path}!")
@@ -392,7 +388,6 @@ def compress(
     remote_path = _construct_path(".", host_conf)
     with conn.cd(remote_path):
         cmd = f"{cmp_cmd} {cmp_args} {" ".join(files)}"
-        # print(cmd)
         conn.run(cmd)
 
 

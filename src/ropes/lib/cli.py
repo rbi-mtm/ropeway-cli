@@ -253,7 +253,6 @@ def compress(ctx, use, exclude, only_cwd):
 
     if files is not None:
         files = set(files)
-        # print(files)
         actions_remote.compress(ctx.obj["conn"], ctx.obj["host_conf"], use, "-v", files)
 
 
@@ -299,7 +298,6 @@ def cp(ctx, src, dest):
     short_help="Execute an arbitrary command on the remote host. ⚠ WARNING: use with care!"
 )
 @click.option("-D", "directory", default=".", help="Directory in which to run command.")
-# @click.option("--list", "list_custom_commands", is_flag=True, help="List custom commands")
 @click.argument("cmd", required=False)
 @click.pass_context
 def run(ctx, cmd, directory):
