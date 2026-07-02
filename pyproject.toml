@@ -22,7 +22,21 @@ dev = [
     "pycodestyle",
     "pyflakes",
     "mypy",
+    "pytest>=8.0",
+    "pytest-mock>=3.0",
+    "pytest-cov>=6.0",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.coverage.run]
+source = ["src/ropes"]
+relative_files = true
+
+[tool.coverage.report]
+show_missing = true
+fail_under = 0
 
 [project.scripts]
 ropes = "ropes.main:main"

@@ -319,13 +319,13 @@ def run(ctx, cmd, directory):
         consequences.  You are solely responsible for understanding
         what the command does before running it.  Always verify the
         command string, especially when using aliases or interpolating
-        user-supplied values.
+        values.
     """
     if cmd is None:
         for k in ctx.obj["host_conf"]:
             if k.startswith("@"):
-                click.echo("---")
-                click.echo(f"{k}: {ctx.obj["host_conf"][k]}")
+                click.echo(click.style("-"*80, bold=True, fg="red"))
+                click.echo(f"{click.style(k, bold=True, fg="blue")}: {ctx.obj["host_conf"][k]}")
         return
 
     actions_remote.run(ctx.obj["conn"], ctx.obj["host_conf"], cmd, directory)
