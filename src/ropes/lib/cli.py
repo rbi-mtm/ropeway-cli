@@ -173,6 +173,7 @@ def sync_cwd(ctx, rsync_args, from_remote):
 @click.argument("expr", required=False)
 @click.pass_context
 def find(ctx, find_cmd, find_args, full_path, show_type, expr):
+    # pylint: disable=too-many-arguments,too-many-positional-arguments
     """Search for files on the remote host.
 
     Runs a file search backend (``find`` or ``fd``) on the remote host
@@ -194,9 +195,11 @@ def find(ctx, find_cmd, find_args, full_path, show_type, expr):
         else:
             msg = f"{f}"
             if show_type:
+                # pylint: disable=protected-access
                 file_type = actions_remote._get_file_type(
                     ctx.obj["conn"], actions_remote._construct_path(f, ctx.obj["host_conf"])
                 )
+                # pylint: enable=protected-access
                 msg = f"{file_type:15} {f}"
             click.echo(msg)
 
@@ -341,6 +344,7 @@ def run(ctx, cmd, directory):
 @click.argument("path_2")
 @click.pass_context
 def diff(ctx, diff_cmd, diff_args, local, path_1, path_2):
+    # pylint: disable=too-many-arguments,too-many-positional-arguments
     """Compare two remote files using a diff tool.
 
     By default runs the diff command directly on the remote host.

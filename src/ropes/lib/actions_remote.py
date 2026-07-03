@@ -511,6 +511,7 @@ def diff(
     diff_args: str,
     local: bool,
 ) -> int:
+    # pylint: disable=too-many-arguments,too-many-positional-arguments
     """Compare two remote files.
 
     Downloads both files to temporary local paths and runs the diff
@@ -555,7 +556,7 @@ def diff(
             _diff_local_cleanup([tmp_1, tmp_2])
 
     else:
-        run_diff = shlex.join(run_diff + [remote_path_1, remote_path_2])
+        run_diff = shlex.join(run_diff + [remote_path_1, remote_path_2])  # type: ignore
         res = conn.run(run_diff, pty=True, warn=True)
         exit_code = res.exited
     return exit_code

@@ -1,3 +1,4 @@
+"""Collection of tests for actions_remote.py"""
 from __future__ import annotations
 
 from pathlib import Path
@@ -8,11 +9,13 @@ import pytest
 from pytest_mock import MockerFixture
 
 from ropes.lib.actions_remote import _construct_path
+from ropes.lib.actions_remote import _diff_local_cleanup
 from ropes.lib.actions_remote import _get_file_type
 from ropes.lib.actions_remote import _rsync
 from ropes.lib.actions_remote import compress
 from ropes.lib.actions_remote import copy as remote_copy
 from ropes.lib.actions_remote import delete_file
+from ropes.lib.actions_remote import diff
 from ropes.lib.actions_remote import find
 from ropes.lib.actions_remote import ls
 from ropes.lib.actions_remote import mkdir
@@ -21,7 +24,6 @@ from ropes.lib.actions_remote import remote_fetch
 from ropes.lib.actions_remote import remote_put
 from ropes.lib.actions_remote import run as remote_run
 from ropes.lib.actions_remote import sync_cwd
-from ropes.lib.actions_remote import diff
 from ropes.lib.actions_remote import tail
 
 
@@ -253,6 +255,15 @@ class TestRsync:
         assert cmd[-2] == "myhost:/remote/path/"
         assert cmd[-1] == "/local/path/"
 
+    def test_rsync_subprocess_failure(self, mocker: MockerFixture) -> None:
+        """subprocess.run failure (check=True) raises CalledProcessError."""
+        import subprocess  # pylint: disable=import-outside-toplevel
+
+        mock_subprocess = mocker.patch("ropes.lib.actions_remote.subprocess.run")
+        mock_subprocess.side_effect = subprocess.CalledProcessError(1, ["rsync"])
+        with pytest.raises(subprocess.CalledProcessError):
+            _rsync("myhost", "/local/path", "/remote/path", "-auvz")
+
 
 class TestSyncCwd:
     """Tests for sync_cwd: syncing the current working directory."""
@@ -283,7 +294,11 @@ class TestSyncCwd:
         mock_rsync = mocker.patch("ropes.lib.actions_remote._rsync")
         sync_cwd(mock_conn, host_conf, "-auvz", from_remote=True)
         mock_rsync.assert_called_once_with(
-            "testhost", "/remote/home/user/project", "/home/user/project", "-auvz", src_is_remote=True
+            "testhost",
+            "/remote/home/user/project",
+            "/home/user/project",
+            "-auvz",
+            src_is_remote=True,
         )
 
     def test_sync_nested_dir(
@@ -357,6 +372,18 @@ class TestFind:
         with pytest.raises(NotImplementedError, match="Functionality for ripgrep not yet"):
             find(mock_conn, host_conf, "ripgrep", "")
 
+    def test_find_remote_failure(
+        self,
+        mocker: MockerFixture,
+        mock_conn: Any,
+        host_conf: dict[str, str],
+    ) -> None:
+        """UnexpectedExit from conn.run is propagated."""
+        mocker.patch("ropes.lib.actions_remote._construct_path", return_value="/remote/root")
+        mock_conn.run.side_effect = invoke.exceptions.UnexpectedExit(None)
+        with pytest.raises(invoke.exceptions.UnexpectedExit):
+            find(mock_conn, host_conf, "find", "")
+
 
 class TestRealpath:
     """Tests for realpath: resolving remote paths."""
@@ -383,6 +410,18 @@ class TestRealpath:
         result = realpath(mock_conn, host_conf, "/home/user/project/file.txt", show_type=True)
         assert "regular file" in result
         assert "/remote/home/user/project/file.txt" in result
+
+    def test_realpath_with_type_unknown(
+        self,
+        mock_conn: Any,
+        host_conf: dict[str, str],
+        mocker: MockerFixture,
+    ) -> None:
+        """show_type with 'unknown' file type still returns the path."""
+        mocker.patch("ropes.lib.actions_remote._construct_path", return_value="/remote/path")
+        mocker.patch("ropes.lib.actions_remote._get_file_type", return_value="unknown")
+        result = realpath(mock_conn, host_conf, "/local/path", show_type=True)
+        assert result == f"{'unknown':15} /remote/path"
 
 
 class TestGetFileType:
@@ -415,6 +454,16 @@ class TestCompress:
         """compress forwards the command and file list to conn.run."""
         compress(mock_conn, host_conf, "bzip2", "-v", ["file1.dat", "file2.dat"])
         mock_conn.run.assert_called_once_with("bzip2 -v file1.dat file2.dat")
+
+    def test_compress_remote_failure(
+        self,
+        mock_conn: Any,
+        host_conf: dict[str, str],
+    ) -> None:
+        """UnexpectedExit from conn.run is propagated."""
+        mock_conn.run.side_effect = invoke.exceptions.UnexpectedExit(None)
+        with pytest.raises(invoke.exceptions.UnexpectedExit):
+            compress(mock_conn, host_conf, "gzip", "-k", ["file.dat"])
 
 
 class TestDeleteFile:
@@ -493,6 +542,20 @@ class TestDeleteFile:
         with pytest.raises(ValueError, match="Path is not a file or link"):
             delete_file(mock_conn, host_conf, "/home/user/project")
 
+    def test_delete_rm_failure(
+        self,
+        mocker: MockerFixture,
+        mock_conn: Any,
+        host_conf: dict[str, str],
+    ) -> None:
+        """rm command failure raises UnexpectedExit."""
+        mock_conn.run.return_value.stdout = "regular file\n"
+        mocker.patch("builtins.input", return_value="y")
+        mocker.patch("builtins.print")
+        mock_conn.run.side_effect = [mocker.DEFAULT, invoke.exceptions.UnexpectedExit(None)]
+        with pytest.raises(invoke.exceptions.UnexpectedExit):
+            delete_file(mock_conn, host_conf, "/home/user/project/file.txt")
+
 
 class TestTail:
     """Tests for tail: displaying the end of remote files."""
@@ -515,6 +578,16 @@ class TestTail:
         tail(mock_conn, host_conf, True, "/home/user/project/log.txt")
         mock_conn.run.assert_called_once_with("tail -f /remote/home/user/project/log.txt")
 
+    def test_tail_remote_failure(
+        self,
+        mock_conn: Any,
+        host_conf: dict[str, str],
+    ) -> None:
+        """UnexpectedExit from conn.run is propagated."""
+        mock_conn.run.side_effect = invoke.exceptions.UnexpectedExit(None)
+        with pytest.raises(invoke.exceptions.UnexpectedExit):
+            tail(mock_conn, host_conf, False, "/nonexistent.log")
+
 
 class TestCopy:
     """Tests for copy: copying files on a remote host."""
@@ -536,6 +609,20 @@ class TestCopy:
         mock_conn.run.assert_called_once_with(
             "cp /remote/home/user/project/src.txt /remote/home/user/project/dst.txt"
         )
+
+    def test_copy_remote_failure(
+        self,
+        mock_conn: Any,
+        host_conf: dict[str, str],
+        mocker: MockerFixture,
+    ) -> None:
+        """UnexpectedExit from conn.run is propagated."""
+        mocker.patch("builtins.print")
+        mock_conn.run.side_effect = invoke.exceptions.UnexpectedExit(None)
+        with pytest.raises(invoke.exceptions.UnexpectedExit):
+            remote_copy(
+                mock_conn, host_conf, "/home/user/project/src.txt", "/home/user/project/dst.txt"
+            )
 
 
 class TestRun:
@@ -581,6 +668,39 @@ class TestRun:
         mock_conn.run.return_value.stdout = "regular file\n"
         with pytest.raises(ValueError, match="Directory .* does not exist"):
             remote_run(mock_conn, host_conf, "echo hi", "/home/user/project")
+
+    def test_run_command_failure(
+        self,
+        mocker: MockerFixture,
+        mock_conn: Any,
+        host_conf: dict[str, str],
+    ) -> None:
+        """UnexpectedExit from command execution is propagated."""
+        mock_conn.run.return_value.stdout = "directory\n"
+        mock_conn.run.side_effect = [mocker.DEFAULT, invoke.exceptions.UnexpectedExit(None)]
+        mocker.patch("builtins.print")
+        with pytest.raises(invoke.exceptions.UnexpectedExit):
+            remote_run(mock_conn, host_conf, "echo hello", "/home/user/project")
+
+
+class TestDiffLocalCleanup:
+    """Tests for _diff_local_cleanup: removing temporary diff files."""
+
+    def test_cleanup_removes_each_file(self, mocker: MockerFixture) -> None:
+        """Calls remove_tmp_file for each file in the list."""
+        mock_remove = mocker.patch("ropes.lib.actions_remote.actions_local.remove_tmp_file")
+        tmp_files = [Path("/tmp/foo"), Path("/tmp/bar")]
+        _diff_local_cleanup(tmp_files)
+        assert mock_remove.call_args_list == [
+            mocker.call(Path("/tmp/foo")),
+            mocker.call(Path("/tmp/bar")),
+        ]
+
+    def test_cleanup_empty_list(self, mocker: MockerFixture) -> None:
+        """Empty list does not call remove_tmp_file."""
+        mock_remove = mocker.patch("ropes.lib.actions_remote.actions_local.remove_tmp_file")
+        _diff_local_cleanup([])
+        mock_remove.assert_not_called()
 
 
 class TestDiff:
@@ -681,9 +801,7 @@ class TestDiff:
         """Local mode: identical files, subprocess exits 0, temps cleaned."""
         tmp_a = tmp_path / "ropes_a.txt"
         tmp_b = tmp_path / "ropes_b.txt"
-        mocker.patch(
-            "ropes.lib.actions_local.create_tmp_file", side_effect=[tmp_a, tmp_b]
-        )
+        mocker.patch("ropes.lib.actions_local.create_tmp_file", side_effect=[tmp_a, tmp_b])
         mock_fetch = mocker.patch("ropes.lib.actions_remote.remote_fetch")
         mock_remove = mocker.patch("ropes.lib.actions_local.remove_tmp_file")
         mock_subprocess = mocker.patch(
@@ -706,9 +824,7 @@ class TestDiff:
         """Local mode: files differ, subprocess exits 1, return code propagated."""
         tmp_a = tmp_path / "ropes_a.txt"
         tmp_b = tmp_path / "ropes_b.txt"
-        mocker.patch(
-            "ropes.lib.actions_local.create_tmp_file", side_effect=[tmp_a, tmp_b]
-        )
+        mocker.patch("ropes.lib.actions_local.create_tmp_file", side_effect=[tmp_a, tmp_b])
         mocker.patch("ropes.lib.actions_remote.remote_fetch")
         mock_remove = mocker.patch("ropes.lib.actions_local.remove_tmp_file")
         mocker.patch(
@@ -729,9 +845,7 @@ class TestDiff:
         """Local mode: custom diff cmd and args forwarded to subprocess."""
         tmp_a = tmp_path / "ropes_a.txt"
         tmp_b = tmp_path / "ropes_b.txt"
-        mocker.patch(
-            "ropes.lib.actions_local.create_tmp_file", side_effect=[tmp_a, tmp_b]
-        )
+        mocker.patch("ropes.lib.actions_local.create_tmp_file", side_effect=[tmp_a, tmp_b])
         mocker.patch("ropes.lib.actions_remote.remote_fetch")
         mocker.patch("ropes.lib.actions_local.remove_tmp_file")
         mock_subprocess = mocker.patch(
@@ -747,9 +861,7 @@ class TestDiff:
             diff_args="-n",
             local=True,
         )
-        mock_subprocess.assert_called_once_with(
-            ["meld", "-n", tmp_a, tmp_b], check=False
-        )
+        mock_subprocess.assert_called_once_with(["meld", "-n", tmp_a, tmp_b], check=False)
 
     def test_diff_local_first_file_missing(
         self,
@@ -761,9 +873,7 @@ class TestDiff:
         """Local mode: first fetch fails, both temps cleaned, error propagated."""
         tmp_a = tmp_path / "ropes_a.txt"
         tmp_b = tmp_path / "ropes_b.txt"
-        mocker.patch(
-            "ropes.lib.actions_local.create_tmp_file", side_effect=[tmp_a, tmp_b]
-        )
+        mocker.patch("ropes.lib.actions_local.create_tmp_file", side_effect=[tmp_a, tmp_b])
         mocker.patch(
             "ropes.lib.actions_remote.remote_fetch",
             side_effect=FileNotFoundError,
@@ -783,9 +893,7 @@ class TestDiff:
         """Local mode: second fetch fails, both temps cleaned, error propagated."""
         tmp_a = tmp_path / "ropes_a.txt"
         tmp_b = tmp_path / "ropes_b.txt"
-        mocker.patch(
-            "ropes.lib.actions_local.create_tmp_file", side_effect=[tmp_a, tmp_b]
-        )
+        mocker.patch("ropes.lib.actions_local.create_tmp_file", side_effect=[tmp_a, tmp_b])
         mocker.patch(
             "ropes.lib.actions_remote.remote_fetch",
             side_effect=[None, FileNotFoundError],
@@ -805,9 +913,7 @@ class TestDiff:
         """Local mode: subprocess.run raises, temps cleaned, error propagated."""
         tmp_a = tmp_path / "ropes_a.txt"
         tmp_b = tmp_path / "ropes_b.txt"
-        mocker.patch(
-            "ropes.lib.actions_local.create_tmp_file", side_effect=[tmp_a, tmp_b]
-        )
+        mocker.patch("ropes.lib.actions_local.create_tmp_file", side_effect=[tmp_a, tmp_b])
         mocker.patch("ropes.lib.actions_remote.remote_fetch")
         mock_remove = mocker.patch("ropes.lib.actions_local.remove_tmp_file")
         mocker.patch(
@@ -828,9 +934,7 @@ class TestDiff:
         """Local mode: any exception triggers temp cleanup via finally blocks."""
         tmp_a = tmp_path / "ropes_a.txt"
         tmp_b = tmp_path / "ropes_b.txt"
-        mocker.patch(
-            "ropes.lib.actions_local.create_tmp_file", side_effect=[tmp_a, tmp_b]
-        )
+        mocker.patch("ropes.lib.actions_local.create_tmp_file", side_effect=[tmp_a, tmp_b])
         mocker.patch("ropes.lib.actions_remote.remote_fetch")
         mock_remove = mocker.patch("ropes.lib.actions_local.remove_tmp_file")
         mocker.patch(
