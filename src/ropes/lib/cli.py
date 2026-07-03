@@ -324,8 +324,40 @@ def run(ctx, cmd, directory):
     if cmd is None:
         for k in ctx.obj["host_conf"]:
             if k.startswith("@"):
-                click.echo(click.style("-"*80, bold=True, fg="red"))
+                click.echo(click.style("-" * 80, bold=True, fg="red"))
                 click.echo(f"{click.style(k, bold=True, fg="blue")}: {ctx.obj["host_conf"][k]}")
         return
 
     actions_remote.run(ctx.obj["conn"], ctx.obj["host_conf"], cmd, directory)
+
+
+@cli.command(short_help="Compare two remote files (remotely or locally)")
+@click.option("--use", "diff_cmd", default="diff", help="diff command used for finding files")
+@click.option("--args", "diff_args", default="", help="Arguments for diff command")
+@click.option(
+    "--local", "local", is_flag=True, help="Download files to temp files and compare locally"
+)
+@click.argument("path_1")
+@click.argument("path_2")
+@click.pass_context
+def diff(ctx, diff_cmd, diff_args, local, path_1, path_2):
+    """Compare two remote files using a diff tool.
+
+    By default runs the diff command directly on the remote host.
+    Use ``--local`` to download the files to temporary locations and
+    compare them locally instead (useful when using a graphical diff tool).
+
+    The exit code is displayed as a message: identical (0),
+    different (1), or an error (other).
+    """
+
+    res = actions_remote.diff(
+        ctx.obj["conn"], ctx.obj["host_conf"], path_1, path_2, diff_cmd, diff_args, local
+    )
+
+    if res == 0:
+        click.echo("Files are identical!")
+    elif res == 1:
+        click.echo("Files are different!")
+    else:
+        click.echo("Some error occurred!")

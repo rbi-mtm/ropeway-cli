@@ -29,6 +29,7 @@ convenient Click-based interface for common remote file tasks.
 - **delete** — Remove a remote file (with confirmation)
 - **tail** — Tail a remote file (supports `-f`)
 - **cp** — Copy a file on the remote machine
+- **diff** — Compare two remote files (remotely or locally)
 - **run** — Execute arbitrary commands on the remote host
 
 ## Installation
@@ -91,20 +92,21 @@ The `-H` / `--host` flag is **required** and must match a key in
 ### Commands
 
 | Command | Description |
-|---|---|
-| `ls [PATH]` | List directory contents on the remote host |
-| `view PATH` | Fetch, edit locally, and optionally write back |
+|---|---|---|
+| `ls [PATH]` | List remote directory contents. `--args` to pass options to `ls` |
+| `view PATH` | Fetch, edit locally, optionally write back. `--editor`, `--write`, `--new` |
 | `get PATH` | Download a remote file |
 | `put PATH` | Upload a local file |
 | `mkdir [PATH]` | Create a directory on the remote host |
-| `sync_cwd` | Sync current directory to/from remote via `rsync` |
-| `find [EXPR]` | Search for files on [fd](https://github.com/sharkdp/fd) (default) or `find` backends. Supports `--use`, `--args`, `--full-path`, `--show-type` |
-| `realpath PATH` | Resolve the absolute remote path |
-| `compress` | Compress files in a remote directory |
+| `sync_cwd` | Sync current directory via `rsync`. `--args` for rsync flags, `--from` for remote→local |
+| `find [EXPR]` | Search files via `fd` or `find`. `--use`, `--args`, `--full-path`, `--show-type` |
+| `realpath PATH` | Resolve absolute remote path. `--show-type` to prefix file type |
+| `compress` | Compress files remotely. `--use` (compressor), `--exclude` (patterns), `--only-cwd` |
 | `delete PATH` | Delete a remote file (prompts for confirmation) |
-| `tail FILENAME` | Tail a remote file |
+| `tail FILENAME` | Tail a remote file. `-f` for follow mode |
 | `cp SRC DEST` | Copy a file on the remote machine |
-| `run CMD` | Run an arbitrary command or `@alias` on the remote host |
+| `diff PATH_1 PATH_2` | Compare two remote files. `--use` (diff tool), `--args`, `--local` (download and diff locally) |
+| `run CMD` | Run an arbitrary command or `@alias` on the remote host. `-D` / `--directory` to set working dir |
 
 ### Examples
 
@@ -151,6 +153,15 @@ ropes -H mycluster cp /remote/path/file.txt /remote/path/file.bak
 # Run a command or alias
 ropes -H mycluster run "ls -la /tmp"
 ropes -H mycluster run @mycommand
+
+# Compare two remote files (default: remote diff)
+ropes -H mycluster diff /remote/path/a.txt /remote/path/b.txt
+
+# Compare using a custom diff tool
+ropes -H mycluster diff /remote/path/a.txt /remote/path/b.txt --use vimdiff
+
+# Download and compare locally
+ropes -H mycluster diff /remote/path/a.txt /remote/path/b.txt --local
 ```
 
 ## Path Mapping

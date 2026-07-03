@@ -157,7 +157,7 @@ def construct_local_path(path: str, host_conf: dict[str, Any]) -> pathlib.Path:
         if path == remote_base:
             return pathlib.Path(local_base)
         if path.startswith(remote_base + "/"):
-            return pathlib.Path(local_base + path[len(remote_base):])
+            return pathlib.Path(local_base + path[len(remote_base) :])
         return pathlib.Path(path)
 
     cwd = os.getcwd()

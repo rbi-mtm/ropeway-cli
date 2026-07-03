@@ -854,6 +854,12 @@ dev = [
     { name = "pytest-mock" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "pytest" },
+    { name = "pytest-mock" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "black", marker = "extra == 'dev'" },
@@ -871,6 +877,12 @@ requires-dist = [
     { name = "rich-click", specifier = ">=1.9.7" },
 ]
 provides-extras = ["dev"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "pytest", specifier = ">=9.1.1" },
+    { name = "pytest-mock", specifier = ">=3.15.1" },
+]
 
 [[package]]
 name = "tomlkit"

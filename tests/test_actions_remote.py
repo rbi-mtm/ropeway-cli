@@ -21,6 +21,7 @@ from ropes.lib.actions_remote import remote_fetch
 from ropes.lib.actions_remote import remote_put
 from ropes.lib.actions_remote import run as remote_run
 from ropes.lib.actions_remote import sync_cwd
+from ropes.lib.actions_remote import diff
 from ropes.lib.actions_remote import tail
 
 
@@ -580,3 +581,281 @@ class TestRun:
         mock_conn.run.return_value.stdout = "regular file\n"
         with pytest.raises(ValueError, match="Directory .* does not exist"):
             remote_run(mock_conn, host_conf, "echo hi", "/home/user/project")
+
+
+class TestDiff:
+    """Tests for diff: comparing two remote files."""
+
+    # --- Remote mode (default) ---
+
+    def test_diff_remote_identical(
+        self,
+        mocker: MockerFixture,
+        mock_conn: Any,
+        host_conf: dict[str, str],
+    ) -> None:
+        """Identical remote files: diff exits 0."""
+        mocker.patch(
+            "ropes.lib.actions_remote._construct_path",
+            side_effect=["/remote/a.txt", "/remote/b.txt"],
+        )
+        result = diff(mock_conn, host_conf, "path_a", "path_b", "diff", "", False)
+        assert result == 0
+        mock_conn.run.assert_called_once_with(
+            "diff /remote/a.txt /remote/b.txt", pty=True, warn=True
+        )
+
+    def test_diff_remote_different(
+        self,
+        mocker: MockerFixture,
+        mock_conn: Any,
+        host_conf: dict[str, str],
+    ) -> None:
+        """Different remote files: diff exits 1, propagated as return value."""
+        mocker.patch(
+            "ropes.lib.actions_remote._construct_path",
+            side_effect=["/remote/a.txt", "/remote/b.txt"],
+        )
+        mock_conn.run.return_value.exited = 1
+        result = diff(mock_conn, host_conf, "path_a", "path_b", "diff", "", False)
+        assert result == 1
+
+    def test_diff_remote_custom_cmd(
+        self,
+        mocker: MockerFixture,
+        mock_conn: Any,
+        host_conf: dict[str, str],
+    ) -> None:
+        """Custom diff command (e.g. vimdiff) is used in the remote command string."""
+        mocker.patch(
+            "ropes.lib.actions_remote._construct_path",
+            side_effect=["/remote/a.txt", "/remote/b.txt"],
+        )
+        diff(mock_conn, host_conf, "path_a", "path_b", "vimdiff", "", False)
+        mock_conn.run.assert_called_once_with(
+            "vimdiff /remote/a.txt /remote/b.txt", pty=True, warn=True
+        )
+
+    def test_diff_remote_custom_args(
+        self,
+        mocker: MockerFixture,
+        mock_conn: Any,
+        host_conf: dict[str, str],
+    ) -> None:
+        """Extra diff arguments (e.g. -u) appear in the remote command."""
+        mocker.patch(
+            "ropes.lib.actions_remote._construct_path",
+            side_effect=["/remote/a.txt", "/remote/b.txt"],
+        )
+        diff(mock_conn, host_conf, "path_a", "path_b", "diff", "-u", False)
+        mock_conn.run.assert_called_once_with(
+            "diff -u /remote/a.txt /remote/b.txt", pty=True, warn=True
+        )
+
+    def test_diff_remote_path_translation(
+        self,
+        mocker: MockerFixture,
+        mock_conn: Any,
+        host_conf: dict[str, str],
+    ) -> None:
+        """Both paths are translated via _construct_path before diff."""
+        mock_construct = mocker.patch(
+            "ropes.lib.actions_remote._construct_path",
+            side_effect=["/remote/x.txt", "/remote/y.txt"],
+        )
+        diff(mock_conn, host_conf, "local_a", "local_b", "diff", "", False)
+        assert mock_construct.call_args_list == [
+            mocker.call("local_a", host_conf),
+            mocker.call("local_b", host_conf),
+        ]
+
+    # --- Local mode ---
+
+    def test_diff_local_identical(
+        self,
+        mocker: MockerFixture,
+        mock_conn: Any,
+        host_conf: dict[str, str],
+        tmp_path: Path,
+    ) -> None:
+        """Local mode: identical files, subprocess exits 0, temps cleaned."""
+        tmp_a = tmp_path / "ropes_a.txt"
+        tmp_b = tmp_path / "ropes_b.txt"
+        mocker.patch(
+            "ropes.lib.actions_local.create_tmp_file", side_effect=[tmp_a, tmp_b]
+        )
+        mock_fetch = mocker.patch("ropes.lib.actions_remote.remote_fetch")
+        mock_remove = mocker.patch("ropes.lib.actions_local.remove_tmp_file")
+        mock_subprocess = mocker.patch(
+            "ropes.lib.actions_remote.subprocess.run",
+            return_value=mocker.MagicMock(returncode=0),
+        )
+        result = diff(mock_conn, host_conf, "path_a", "path_b", "diff", "", True)
+        assert result == 0
+        assert mock_fetch.call_count == 2
+        assert mock_remove.call_count == 2
+        mock_subprocess.assert_called_once_with(["diff", tmp_a, tmp_b], check=False)
+
+    def test_diff_local_different(
+        self,
+        mocker: MockerFixture,
+        mock_conn: Any,
+        host_conf: dict[str, str],
+        tmp_path: Path,
+    ) -> None:
+        """Local mode: files differ, subprocess exits 1, return code propagated."""
+        tmp_a = tmp_path / "ropes_a.txt"
+        tmp_b = tmp_path / "ropes_b.txt"
+        mocker.patch(
+            "ropes.lib.actions_local.create_tmp_file", side_effect=[tmp_a, tmp_b]
+        )
+        mocker.patch("ropes.lib.actions_remote.remote_fetch")
+        mock_remove = mocker.patch("ropes.lib.actions_local.remove_tmp_file")
+        mocker.patch(
+            "ropes.lib.actions_remote.subprocess.run",
+            return_value=mocker.MagicMock(returncode=1),
+        )
+        result = diff(mock_conn, host_conf, "path_a", "path_b", "diff", "", True)
+        assert result == 1
+        assert mock_remove.call_count == 2
+
+    def test_diff_local_custom_cmd_and_args(
+        self,
+        mocker: MockerFixture,
+        mock_conn: Any,
+        host_conf: dict[str, str],
+        tmp_path: Path,
+    ) -> None:
+        """Local mode: custom diff cmd and args forwarded to subprocess."""
+        tmp_a = tmp_path / "ropes_a.txt"
+        tmp_b = tmp_path / "ropes_b.txt"
+        mocker.patch(
+            "ropes.lib.actions_local.create_tmp_file", side_effect=[tmp_a, tmp_b]
+        )
+        mocker.patch("ropes.lib.actions_remote.remote_fetch")
+        mocker.patch("ropes.lib.actions_local.remove_tmp_file")
+        mock_subprocess = mocker.patch(
+            "ropes.lib.actions_remote.subprocess.run",
+            return_value=mocker.MagicMock(returncode=0),
+        )
+        diff(
+            mock_conn,
+            host_conf,
+            "path_a",
+            "path_b",
+            diff_cmd="meld",
+            diff_args="-n",
+            local=True,
+        )
+        mock_subprocess.assert_called_once_with(
+            ["meld", "-n", tmp_a, tmp_b], check=False
+        )
+
+    def test_diff_local_first_file_missing(
+        self,
+        mocker: MockerFixture,
+        mock_conn: Any,
+        host_conf: dict[str, str],
+        tmp_path: Path,
+    ) -> None:
+        """Local mode: first fetch fails, both temps cleaned, error propagated."""
+        tmp_a = tmp_path / "ropes_a.txt"
+        tmp_b = tmp_path / "ropes_b.txt"
+        mocker.patch(
+            "ropes.lib.actions_local.create_tmp_file", side_effect=[tmp_a, tmp_b]
+        )
+        mocker.patch(
+            "ropes.lib.actions_remote.remote_fetch",
+            side_effect=FileNotFoundError,
+        )
+        mock_remove = mocker.patch("ropes.lib.actions_local.remove_tmp_file")
+        with pytest.raises(FileNotFoundError):
+            diff(mock_conn, host_conf, "path_a", "path_b", "diff", "", True)
+        assert mock_remove.call_count == 2
+
+    def test_diff_local_second_file_missing(
+        self,
+        mocker: MockerFixture,
+        mock_conn: Any,
+        host_conf: dict[str, str],
+        tmp_path: Path,
+    ) -> None:
+        """Local mode: second fetch fails, both temps cleaned, error propagated."""
+        tmp_a = tmp_path / "ropes_a.txt"
+        tmp_b = tmp_path / "ropes_b.txt"
+        mocker.patch(
+            "ropes.lib.actions_local.create_tmp_file", side_effect=[tmp_a, tmp_b]
+        )
+        mocker.patch(
+            "ropes.lib.actions_remote.remote_fetch",
+            side_effect=[None, FileNotFoundError],
+        )
+        mock_remove = mocker.patch("ropes.lib.actions_local.remove_tmp_file")
+        with pytest.raises(FileNotFoundError):
+            diff(mock_conn, host_conf, "path_a", "path_b", "diff", "", True)
+        assert mock_remove.call_count == 2
+
+    def test_diff_local_diff_cmd_not_found(
+        self,
+        mocker: MockerFixture,
+        mock_conn: Any,
+        host_conf: dict[str, str],
+        tmp_path: Path,
+    ) -> None:
+        """Local mode: subprocess.run raises, temps cleaned, error propagated."""
+        tmp_a = tmp_path / "ropes_a.txt"
+        tmp_b = tmp_path / "ropes_b.txt"
+        mocker.patch(
+            "ropes.lib.actions_local.create_tmp_file", side_effect=[tmp_a, tmp_b]
+        )
+        mocker.patch("ropes.lib.actions_remote.remote_fetch")
+        mock_remove = mocker.patch("ropes.lib.actions_local.remove_tmp_file")
+        mocker.patch(
+            "ropes.lib.actions_remote.subprocess.run",
+            side_effect=FileNotFoundError("diff: not found"),
+        )
+        with pytest.raises(FileNotFoundError):
+            diff(mock_conn, host_conf, "path_a", "path_b", "diff", "", True)
+        assert mock_remove.call_count == 2
+
+    def test_diff_local_cleanup_on_any_error(
+        self,
+        mocker: MockerFixture,
+        mock_conn: Any,
+        host_conf: dict[str, str],
+        tmp_path: Path,
+    ) -> None:
+        """Local mode: any exception triggers temp cleanup via finally blocks."""
+        tmp_a = tmp_path / "ropes_a.txt"
+        tmp_b = tmp_path / "ropes_b.txt"
+        mocker.patch(
+            "ropes.lib.actions_local.create_tmp_file", side_effect=[tmp_a, tmp_b]
+        )
+        mocker.patch("ropes.lib.actions_remote.remote_fetch")
+        mock_remove = mocker.patch("ropes.lib.actions_local.remove_tmp_file")
+        mocker.patch(
+            "ropes.lib.actions_remote.subprocess.run",
+            side_effect=RuntimeError("unexpected"),
+        )
+        with pytest.raises(RuntimeError):
+            diff(mock_conn, host_conf, "path_a", "path_b", "diff", "", True)
+        assert mock_remove.call_count == 2
+
+    # --- Edge cases ---
+
+    def test_diff_same_path(
+        self,
+        mocker: MockerFixture,
+        mock_conn: Any,
+        host_conf: dict[str, str],
+    ) -> None:
+        """Same path for both arguments: diff runs (returns 0 for identical)."""
+        mocker.patch(
+            "ropes.lib.actions_remote._construct_path",
+            return_value="/remote/same.txt",
+        )
+        result = diff(mock_conn, host_conf, "same.txt", "same.txt", "diff", "", False)
+        assert result == 0
+        mock_conn.run.assert_called_once_with(
+            "diff /remote/same.txt /remote/same.txt", pty=True, warn=True
+        )

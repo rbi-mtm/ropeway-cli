@@ -40,6 +40,8 @@ from typing import Any
 import fabric
 import invoke
 
+from ropes.lib import actions_local
+
 
 def _construct_path(path: str, host_conf: dict[str, Any]) -> str:
     """Convert a local path to its remote equivalent.
@@ -186,7 +188,7 @@ def sync_cwd(
     conn: fabric.Connection,
     host_conf: dict[str, Any],
     rsync_args: str,
-    from_remote: bool = False,
+    from_remote: bool,
 ):
     """Synchronize the current local directory with a remote directory.
 
@@ -225,9 +227,7 @@ def sync_cwd(
         _rsync(host_conf["hostname"], remote_path, local_path, rsync_args, src_is_remote=True)
 
 
-def _rsync(
-    hostname: str, src: str, dest: str, args: str = "-auvzPh --stats", src_is_remote: bool = False
-):
+def _rsync(hostname: str, src: str, dest: str, args: str, src_is_remote: bool = False):
     """Synchronize files between local and remote hosts via ``rsync``.
 
     Normalizes the source and destination paths by ensuring trailing
@@ -500,3 +500,72 @@ def run(conn: fabric.Connection, host_conf: dict[str, Any], cmd: str, directory:
     with conn.cd(remote_path):
         print(f"Running command on host {host_conf["hostname"]} in {remote_path}: {cmd} ")
         conn.run(cmd)
+
+
+def diff(
+    conn: fabric.Connection,
+    host_conf: dict[str, Any],
+    path_1: str,
+    path_2: str,
+    diff_cmd: str,
+    diff_args: str,
+    local: bool,
+) -> int:
+    """Compare two remote files.
+
+    Downloads both files to temporary local paths and runs the diff
+    command locally, or runs the diff command directly on the remote host.
+
+    Args:
+        conn: Active SSH connection.
+        host_conf: Host configuration from hosts.json.
+        path_1: First remote path.
+        path_2: Second remote path.
+        diff_cmd: Diff program to use (e.g. "diff", "vimdiff").
+        diff_args: Extra arguments for the diff command.
+        local: If True, download files and diff locally; otherwise run
+            remotely.
+
+    Returns:
+        Exit code of the diff command (0 = identical, 1 = different).
+    """
+
+    remote_path_1 = _construct_path(path_1, host_conf)
+    remote_path_2 = _construct_path(path_2, host_conf)
+    exit_code = -1
+
+    run_diff = [diff_cmd]
+    if diff_args:
+        run_diff.append(diff_args)
+
+    if local:
+        tmp_1 = actions_local.create_tmp_file(pathlib.Path(remote_path_1).suffix)
+        tmp_2 = actions_local.create_tmp_file(pathlib.Path(remote_path_2).suffix)
+
+        try:
+            remote_fetch(conn, host_conf, remote_path_1, tmp_1)
+            remote_fetch(conn, host_conf, remote_path_2, tmp_2)
+
+            try:
+                res = subprocess.run(run_diff + [tmp_1, tmp_2], check=False)
+            except FileNotFoundError as exc:
+                raise FileNotFoundError(f"{diff_cmd} not found!") from exc
+            exit_code = res.returncode
+        finally:
+            _diff_local_cleanup([tmp_1, tmp_2])
+
+    else:
+        run_diff = shlex.join(run_diff + [remote_path_1, remote_path_2])
+        res = conn.run(run_diff, pty=True, warn=True)
+        exit_code = res.exited
+    return exit_code
+
+
+def _diff_local_cleanup(tmp_files: list[pathlib.Path]):
+    """Remove temporary files created during a local diff.
+
+    Args:
+        tmp_files: List of temporary file paths to remove.
+    """
+    for tmp in tmp_files:
+        actions_local.remove_tmp_file(tmp)
