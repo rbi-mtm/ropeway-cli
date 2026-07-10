@@ -76,7 +76,10 @@ def ls(ctx, path, args):
     Delegates to the remote machine's ``ls`` command. Relative paths
     are translated using the host configuration's path mapping.
     """
-    actions_remote.ls(ctx.obj["conn"], path, ctx.obj["host_conf"], args)
+    try:
+        actions_remote.ls(ctx.obj["conn"], path, ctx.obj["host_conf"], args)
+    except ValueError as exc:
+        click.echo(click.style(exc, fg="red", bg="white"))
 
 
 @cli.command(short_help="View remote file.")
@@ -109,29 +112,31 @@ def view(ctx, path, editor, write, new):
 
 
 @cli.command(short_help="Copy remote file to local machine.")
-@click.argument("path")
+@click.argument("filename")
 @click.pass_context
-def get(ctx, path):
+def get(ctx, filename):
     """Download a remote file to the local machine.
 
-    Translates the remote path to a corresponding local path using the
+    Translates the remote filename to a corresponding local path using the
     host configuration and downloads the file.
     """
-    local_path = actions_local.construct_local_path(path, ctx.obj["host_conf"])
-    actions_remote.remote_fetch(ctx.obj["conn"], ctx.obj["host_conf"], path, local_path)
+    local_path = actions_local.construct_local_path(filename, ctx.obj["host_conf"])
+    actions_remote.remote_fetch(ctx.obj["conn"], ctx.obj["host_conf"], filename, local_path)
 
 
 @cli.command(short_help="Copy local file to remote machine.")
-@click.argument("path")
+@click.argument(
+    "filename",
+)
 @click.pass_context
-def put(ctx, path):
+def put(ctx, filename):
     """Upload a local file to the remote machine.
 
-    Translates the local path to a corresponding remote path using the
+    Translates the local filename to a corresponding remote path using the
     host configuration and uploads the file.
     """
-    local_path = actions_local.construct_local_path(path, ctx.obj["host_conf"])
-    actions_remote.remote_put(ctx.obj["conn"], ctx.obj["host_conf"], path, local_path)
+    local_path = actions_local.construct_local_path(filename, ctx.obj["host_conf"])
+    actions_remote.remote_put(ctx.obj["conn"], ctx.obj["host_conf"], filename, local_path)
 
 
 @cli.command(short_help="Make directory on remote host")
@@ -143,7 +148,10 @@ def mkdir(ctx, path):
     Creates the directory and any missing parent directories. When no
     path is given, uses the name of the current local working directory.
     """
-    actions_remote.mkdir(ctx.obj["conn"], ctx.obj["host_conf"], path)
+    try:
+        actions_remote.mkdir(ctx.obj["conn"], ctx.obj["host_conf"], path)
+    except ValueError as exc:
+        click.echo(click.style(exc, fg="red", bg="white"))
 
 
 @cli.command(short_help="Sync data from current directory to cluster (or vice versa).")
@@ -259,7 +267,7 @@ def compress(ctx, use, exclude, only_cwd):
         actions_remote.compress(ctx.obj["conn"], ctx.obj["host_conf"], use, "-v", files)
 
 
-@cli.command()
+@cli.command(short_help="Delete a file on the remote host.")
 @click.argument("path")
 @click.pass_context
 def delete(ctx, path):
@@ -268,10 +276,13 @@ def delete(ctx, path):
     Prompts for confirmation before removing the file. Only regular
     files can be deleted; directories are rejected.
     """
-    actions_remote.delete_file(ctx.obj["conn"], ctx.obj["host_conf"], path)
+    try:
+        actions_remote.delete_file(ctx.obj["conn"], ctx.obj["host_conf"], path)
+    except ValueError as exc:
+        click.echo(click.style(exc, fg="red", bg="white"))
 
 
-@cli.command()
+@cli.command(short_help="Display the last part of a remote file.")
 @click.option("-f", "tail_f", is_flag=True, help="Passes -f to tail for continous monitoring")
 @click.argument("filename")
 @click.pass_context
@@ -281,7 +292,10 @@ def tail(ctx, tail_f, filename):
     Supports follow mode (``-f``) for continuous monitoring of log
     files (abort using CTRL+C). Output is streamed directly to the terminal.
     """
-    actions_remote.tail(ctx.obj["conn"], ctx.obj["host_conf"], tail_f, filename)
+    try:
+        actions_remote.tail(ctx.obj["conn"], ctx.obj["host_conf"], tail_f, filename)
+    except ValueError as exc:
+        click.echo(click.style(exc, fg="red", bg="white"))
 
 
 @cli.command(short_help="Copy a file on the remote machine.")
@@ -294,7 +308,10 @@ def cp(ctx, src, dest):
     Runs ``cp`` on the remote machine, translating both source and
     destination paths using the host configuration.
     """
-    actions_remote.copy(ctx.obj["conn"], ctx.obj["host_conf"], src, dest)
+    try:
+        actions_remote.copy(ctx.obj["conn"], ctx.obj["host_conf"], src, dest)
+    except ValueError as exc:
+        click.echo(click.style(exc, fg="red", bg="white"))
 
 
 @cli.command(
@@ -331,7 +348,10 @@ def run(ctx, cmd, directory):
                 click.echo(f"{click.style(k, bold=True, fg="blue")}: {ctx.obj["host_conf"][k]}")
         return
 
-    actions_remote.run(ctx.obj["conn"], ctx.obj["host_conf"], cmd, directory)
+    try:
+        actions_remote.run(ctx.obj["conn"], ctx.obj["host_conf"], cmd, directory)
+    except ValueError as exc:
+        click.echo(click.style(exc, fg="red", bg="white"))
 
 
 @cli.command(short_help="Compare two remote files (remotely or locally)")

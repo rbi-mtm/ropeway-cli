@@ -64,10 +64,4 @@ ignore_missing_imports = true
 requires = ["uv_build>=0.10.11,<0.11.0"]
 build-backend = "uv_build"
 
-[dependency-groups]
-dev = [
-    "pytest>=9.1.1",
-    "pytest-mock>=3.15.1",
-]
-
 

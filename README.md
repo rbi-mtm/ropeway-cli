@@ -69,7 +69,8 @@ Create `~/.config/ropes/hosts.json` with one entry per remote host:
   "mycluster": {
     "local_base_path": "/home/user/projects",
     "remote_base_path": "/remote/home/user/projects",
-    "@mycommand": "some_remote_command --with-flags"
+    "@mycommand": "some_remote_command --with-flags",
+    "@build": ["make && make install", "/remote/home/user/projects/build"]
   }
 }
 ```
@@ -78,7 +79,7 @@ Create `~/.config/ropes/hosts.json` with one entry per remote host:
 |---|---|
 | `local_base_path` | Base path on the local machine |
 | `remote_base_path` | Corresponding base path on the remote machine |
-| `@<name>` | Command alias (invoked via `run @<name>`) |
+| `@<name>` | Command alias (invoked via `run @<name>`). Can be a string (the command) or a list `["command", "directory"]` to override the working directory. |
 
 ## Usage
 
@@ -106,7 +107,7 @@ The `-H` / `--host` flag is **required** and must match a key in
 | `tail FILENAME` | Tail a remote file. `-f` for follow mode |
 | `cp SRC DEST` | Copy a file on the remote machine |
 | `diff PATH_1 PATH_2` | Compare two remote files. `--use` (diff tool), `--args`, `--local` (download and diff locally) |
-| `run CMD` | Run an arbitrary command or `@alias` on the remote host. `-D` / `--directory` to set working dir |
+| `run CMD` | Run an arbitrary command or `@alias` on the remote host. `-D` / `--directory` to set working dir (overridden by alias directory if specified) |
 
 ### Examples
 
@@ -153,6 +154,7 @@ ropes -H mycluster cp /remote/path/file.txt /remote/path/file.bak
 # Run a command or alias
 ropes -H mycluster run "ls -la /tmp"
 ropes -H mycluster run @mycommand
+ropes -H mycluster run @build
 
 # Compare two remote files (default: remote diff)
 ropes -H mycluster diff /remote/path/a.txt /remote/path/b.txt
@@ -177,20 +179,32 @@ For example, with the config above:
 - `ropes -H mycluster get /remote/home/user/projects/foo/bar.txt` saves
   the file locally as `/home/user/projects/foo/bar.txt`.
 
-## Development
+## Contributing
+
+Pull requests are welcome. New contributions should include proper tests.
+
+### Setup
 
 ```bash
 git clone https://github.com/bernik86/ropes.git
 cd ropes
-python3 -m venv .venv
-source .venv/bin/activate
-uv sync
+uv venv
+uv pip install -e '.[dev]'
+```
 
-# Lint / format
+### Lint / format
+
+```bash
 uv run isort src/
 uv run black src/
 uv run pylint src/
 uv run mypy src/
+```
+
+### Test
+
+```bash
+uv run pytest -v --cov --cov-report=term-missing
 ```
 
 ## License

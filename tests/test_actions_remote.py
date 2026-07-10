@@ -10,7 +10,9 @@ from pytest_mock import MockerFixture
 
 from ropes.lib.actions_remote import _construct_path
 from ropes.lib.actions_remote import _diff_local_cleanup
+from ropes.lib.actions_remote import _file_exists
 from ropes.lib.actions_remote import _get_file_type
+from ropes.lib.actions_remote import _run_cmd
 from ropes.lib.actions_remote import _rsync
 from ropes.lib.actions_remote import compress
 from ropes.lib.actions_remote import copy as remote_copy
@@ -145,6 +147,57 @@ class TestRemoteFetch:
         with pytest.raises(FileNotFoundError, match="Temporary file not found"):
             remote_fetch(mock_conn, host_conf, "/home/user/project/file.txt", dest)
 
+    def test_fetch_overwrite_declined(
+        self,
+        mocker: MockerFixture,
+        mock_conn: Any,
+        host_conf: dict[str, str],
+        tmp_path: Path,
+    ) -> None:
+        """User declines overwrite: conn.get is not called."""
+        mocker.patch("ropes.lib.actions_remote.os.path.isfile", return_value=True)
+        mocker.patch("builtins.input", return_value="n")
+        mocker.patch("builtins.print")
+        dest = tmp_path / "existing.txt"
+        dest.write_text("old content")
+        remote_fetch(mock_conn, host_conf, "/home/user/project/file.txt", dest)
+        mock_conn.get.assert_not_called()
+
+    def test_fetch_overwrite_accepted(
+        self,
+        mocker: MockerFixture,
+        mock_conn: Any,
+        host_conf: dict[str, str],
+        tmp_path: Path,
+    ) -> None:
+        """User accepts overwrite: conn.get proceeds."""
+        mocker.patch("ropes.lib.actions_remote.os.path.isfile", return_value=True)
+        mocker.patch("builtins.input", return_value="y")
+        mocker.patch("builtins.print")
+        dest = tmp_path / "existing.txt"
+        dest.write_text("old content")
+        remote_fetch(mock_conn, host_conf, "/home/user/project/file.txt", dest)
+        mock_conn.get.assert_called_once()
+
+    def test_fetch_confirm_false_skips_prompt(
+        self,
+        mocker: MockerFixture,
+        mock_conn: Any,
+        host_conf: dict[str, str],
+        tmp_path: Path,
+    ) -> None:
+        """confirm_overwrite=False skips the prompt even if file exists."""
+        mocker.patch("ropes.lib.actions_remote.os.path.isfile", return_value=True)
+        mock_input = mocker.patch("builtins.input")
+        mocker.patch("builtins.print")
+        dest = tmp_path / "existing.txt"
+        dest.write_text("old content")
+        remote_fetch(
+            mock_conn, host_conf, "/home/user/project/file.txt", dest, confirm_overwrite=False
+        )
+        mock_conn.get.assert_called_once()
+        mock_input.assert_not_called()
+
 
 class TestRemotePut:
     """Tests for remote_put: uploading files to a remote host."""
@@ -157,7 +210,7 @@ class TestRemotePut:
     ) -> None:
         """Successful upload: path translation and conn.put call."""
         src = tmp_path / "local.txt"
-        remote_put(mock_conn, host_conf, "/home/user/project/remote.txt", src)
+        remote_put(mock_conn, host_conf, "/home/user/project/remote.txt", src, False)
         mock_conn.put.assert_called_once()
 
     def test_local_file_not_found(
@@ -170,7 +223,52 @@ class TestRemotePut:
         mock_conn.put.side_effect = FileNotFoundError
         src = tmp_path / "missing.txt"
         with pytest.raises(FileNotFoundError, match="Could not find file"):
-            remote_put(mock_conn, host_conf, "/home/user/project/remote.txt", src)
+            remote_put(mock_conn, host_conf, "/home/user/project/remote.txt", src, False)
+
+    def test_put_overwrite_declined(
+        self,
+        mocker: MockerFixture,
+        mock_conn: Any,
+        host_conf: dict[str, str],
+        tmp_path: Path,
+    ) -> None:
+        """User declines overwrite: conn.put is not called."""
+        mocker.patch("ropes.lib.actions_remote._file_exists", return_value=True)
+        mocker.patch("builtins.input", return_value="n")
+        mocker.patch("builtins.print")
+        src = tmp_path / "local.txt"
+        remote_put(mock_conn, host_conf, "/home/user/project/remote.txt", src)
+        mock_conn.put.assert_not_called()
+
+    def test_put_overwrite_accepted(
+        self,
+        mocker: MockerFixture,
+        mock_conn: Any,
+        host_conf: dict[str, str],
+        tmp_path: Path,
+    ) -> None:
+        """User accepts overwrite: conn.put proceeds."""
+        mocker.patch("ropes.lib.actions_remote._file_exists", return_value=True)
+        mocker.patch("builtins.input", return_value="y")
+        mocker.patch("builtins.print")
+        src = tmp_path / "local.txt"
+        remote_put(mock_conn, host_conf, "/home/user/project/remote.txt", src)
+        mock_conn.put.assert_called_once()
+
+    def test_put_no_confirm_when_file_missing(
+        self,
+        mocker: MockerFixture,
+        mock_conn: Any,
+        host_conf: dict[str, str],
+        tmp_path: Path,
+    ) -> None:
+        """confirm_overwrite=True but remote file absent skips the prompt."""
+        mocker.patch("ropes.lib.actions_remote._file_exists", return_value=False)
+        mock_input = mocker.patch("builtins.input")
+        src = tmp_path / "local.txt"
+        remote_put(mock_conn, host_conf, "/home/user/project/remote.txt", src)
+        mock_conn.put.assert_called_once()
+        mock_input.assert_not_called()
 
 
 class TestLs:
@@ -320,6 +418,28 @@ class TestSyncCwd:
             "testhost", "/home/user/project/sub", "/remote/home/user/project/sub", "-auvz"
         )
 
+    def test_sync_pull_nested_dir(
+        self,
+        mocker: MockerFixture,
+        mock_conn: Any,
+        host_conf: dict[str, str],
+    ) -> None:
+        """Pull from a subdirectory: uses _construct_path and skips mkdir."""
+        mocker.patch("ropes.lib.actions_remote.os.getcwd", return_value="/home/user/project/sub")
+        mock_rsync = mocker.patch("ropes.lib.actions_remote._rsync")
+        mocker.patch(
+            "ropes.lib.actions_remote._construct_path",
+            return_value="/remote/home/user/project/sub",
+        )
+        sync_cwd(mock_conn, host_conf, "-auvz", from_remote=True)
+        mock_rsync.assert_called_once_with(
+            "testhost",
+            "/remote/home/user/project/sub",
+            "/home/user/project/sub",
+            "-auvz",
+            src_is_remote=True,
+        )
+
 
 class TestFind:
     """Tests for find: searching for files on a remote host."""
@@ -337,18 +457,20 @@ class TestFind:
         assert result == ["file1.py", "file2.py", ""]
         mock_conn.run.assert_called_once_with("find . -name '*.py'", hide=True)
 
+    @pytest.mark.parametrize("backend", ["fd", "rust_find"])
     def test_find_with_fd(
         self,
         mocker: MockerFixture,
         mock_conn: Any,
         host_conf: dict[str, str],
+        backend: str,
     ) -> None:
-        """fd backend returns results split by newline."""
+        """fd backend (and rust_find alias) return results split by newline."""
         mocker.patch("ropes.lib.actions_remote._construct_path", return_value="/remote/root")
         mock_conn.run.return_value.stdout = "a.py\nb.py\n"
-        result = find(mock_conn, host_conf, "fd", "-e py", expr=".")
+        result = find(mock_conn, host_conf, backend, "-e py", expr="")
         assert result == ["a.py", "b.py", ""]
-        mock_conn.run.assert_called_once_with("fd -e py . .", hide=True)
+        mock_conn.run.assert_called_once_with("fd -e py  .", hide=True)
 
     def test_find_no_results(
         self,
@@ -383,6 +505,7 @@ class TestFind:
         mock_conn.run.side_effect = invoke.exceptions.UnexpectedExit(None)
         with pytest.raises(invoke.exceptions.UnexpectedExit):
             find(mock_conn, host_conf, "find", "")
+
 
 
 class TestRealpath:
@@ -465,50 +588,41 @@ class TestCompress:
         with pytest.raises(invoke.exceptions.UnexpectedExit):
             compress(mock_conn, host_conf, "gzip", "-k", ["file.dat"])
 
+    def test_compress_empty_args(
+        self,
+        mock_conn: Any,
+        host_conf: dict[str, str],
+    ) -> None:
+        """Empty cmp_args produces a command with extra whitespace but runs."""
+        compress(mock_conn, host_conf, "bzip2", "", ["file.dat"])
+        mock_conn.run.assert_called_once_with("bzip2  file.dat")
+
+    def test_compress_empty_files(
+        self,
+        mock_conn: Any,
+        host_conf: dict[str, str],
+    ) -> None:
+        """Empty files list produces a trailing-space command but runs."""
+        compress(mock_conn, host_conf, "bzip2", "-v", [])
+        mock_conn.run.assert_called_once_with("bzip2 -v ")
+
 
 class TestDeleteFile:
     """Tests for delete_file: deleting remote files."""
 
+    @pytest.mark.parametrize(
+        "file_type",
+        ["regular file", "symbolic link", "regular empty file"],
+    )
     def test_delete_confirmed(
         self,
         mocker: MockerFixture,
         mock_conn: Any,
         host_conf: dict[str, str],
+        file_type: str,
     ) -> None:
-        """Regular file is confirmed and deleted: stat then rm."""
-        mock_conn.run.return_value.stdout = "regular file\n"
-        mocker.patch("builtins.input", return_value="y")
-        mocker.patch("builtins.print")
-        delete_file(mock_conn, host_conf, "/home/user/project/file.txt")
-        assert mock_conn.run.mock_calls == [
-            mocker.call("stat -c %F /remote/home/user/project/file.txt", hide=True),
-            mocker.call("rm /remote/home/user/project/file.txt"),
-        ]
-
-    def test_delete_confirmed_symlink(
-        self,
-        mocker: MockerFixture,
-        mock_conn: Any,
-        host_conf: dict[str, str],
-    ) -> None:
-        """Symbolic link is allowed for deletion."""
-        mock_conn.run.return_value.stdout = "symbolic link\n"
-        mocker.patch("builtins.input", return_value="y")
-        mocker.patch("builtins.print")
-        delete_file(mock_conn, host_conf, "/home/user/project/file.txt")
-        assert mock_conn.run.mock_calls == [
-            mocker.call("stat -c %F /remote/home/user/project/file.txt", hide=True),
-            mocker.call("rm /remote/home/user/project/file.txt"),
-        ]
-
-    def test_delete_confirmed_empty_file(
-        self,
-        mocker: MockerFixture,
-        mock_conn: Any,
-        host_conf: dict[str, str],
-    ) -> None:
-        """Regular empty file is allowed for deletion."""
-        mock_conn.run.return_value.stdout = "regular empty file\n"
+        """File and link types are confirmed and deleted: stat then rm."""
+        mock_conn.run.return_value.stdout = f"{file_type}\n"
         mocker.patch("builtins.input", return_value="y")
         mocker.patch("builtins.print")
         delete_file(mock_conn, host_conf, "/home/user/project/file.txt")
@@ -556,6 +670,16 @@ class TestDeleteFile:
         with pytest.raises(invoke.exceptions.UnexpectedExit):
             delete_file(mock_conn, host_conf, "/home/user/project/file.txt")
 
+    def test_delete_unknown_type_raises(
+        self,
+        mock_conn: Any,
+        host_conf: dict[str, str],
+    ) -> None:
+        """Unknown file type (stat failure) raises ValueError."""
+        mock_conn.run.side_effect = invoke.exceptions.UnexpectedExit(None)
+        with pytest.raises(ValueError, match="Path is not a file or link"):
+            delete_file(mock_conn, host_conf, "/home/user/project/file.txt")
+
 
 class TestTail:
     """Tests for tail: displaying the end of remote files."""
@@ -567,7 +691,7 @@ class TestTail:
     ) -> None:
         """tail without -f reads the file and exits."""
         tail(mock_conn, host_conf, False, "/home/user/project/log.txt")
-        mock_conn.run.assert_called_once_with("tail /remote/home/user/project/log.txt")
+        mock_conn.run.assert_called_once_with("tail /remote/home/user/project/log.txt", warn=True)
 
     def test_tail_follow(
         self,
@@ -576,7 +700,7 @@ class TestTail:
     ) -> None:
         """tail -f follows the file and streams new content."""
         tail(mock_conn, host_conf, True, "/home/user/project/log.txt")
-        mock_conn.run.assert_called_once_with("tail -f /remote/home/user/project/log.txt")
+        mock_conn.run.assert_called_once_with("tail -f /remote/home/user/project/log.txt", warn=True)
 
     def test_tail_remote_failure(
         self,
@@ -607,7 +731,7 @@ class TestCopy:
             "/home/user/project/dst.txt",
         )
         mock_conn.run.assert_called_once_with(
-            "cp /remote/home/user/project/src.txt /remote/home/user/project/dst.txt"
+            "cp /remote/home/user/project/src.txt /remote/home/user/project/dst.txt", warn=True
         )
 
     def test_copy_remote_failure(
@@ -636,7 +760,7 @@ class TestRun:
         """A plain command is executed after the directory is verified."""
         mock_conn.run.return_value.stdout = "directory\n"
         remote_run(mock_conn, host_conf, "echo hello", "/home/user/project")
-        mock_conn.run.assert_called_with("echo hello")
+        mock_conn.run.assert_called_with("echo hello", warn=True)
 
     def test_run_with_alias(self, mock_conn: Any) -> None:
         """An @-prefixed command is resolved from host_conf and executed."""
@@ -648,7 +772,7 @@ class TestRun:
         }
         mock_conn.run.return_value.stdout = "directory\n"
         remote_run(mock_conn, conf, "@build", "/local")
-        mock_conn.run.assert_called_with("make && make install")
+        mock_conn.run.assert_called_with("make && make install", warn=True)
 
     def test_run_unknown_alias(
         self,
@@ -681,6 +805,106 @@ class TestRun:
         mocker.patch("builtins.print")
         with pytest.raises(invoke.exceptions.UnexpectedExit):
             remote_run(mock_conn, host_conf, "echo hello", "/home/user/project")
+
+    def test_run_alias_with_directory(self, mock_conn: Any) -> None:
+        """An @-alias with a list [cmd, dir] overrides the working directory."""
+        conf: dict[str, str] = {
+            "local_base_path": "/local",
+            "remote_base_path": "/remote",
+            "hostname": "h",
+            "@build": ["make", "/custom/build/dir"],
+        }
+        mock_conn.run.return_value.stdout = "directory\n"
+        remote_run(mock_conn, conf, "@build", "/local")
+        mock_conn.run.assert_called_with("make", warn=True)
+        mock_conn.cd.assert_called_once_with("/custom/build/dir")
+
+    def test_run_alias_with_directory_overrides_argument(self, mock_conn: Any) -> None:
+        """The alias directory takes precedence over the -D argument."""
+        conf: dict[str, str] = {
+            "local_base_path": "/local",
+            "remote_base_path": "/remote",
+            "hostname": "h",
+            "@build": ["make", "/alias/dir"],
+        }
+        mock_conn.run.return_value.stdout = "directory\n"
+        remote_run(mock_conn, conf, "@build", "/user/supplied/dir")
+        mock_conn.cd.assert_called_once_with("/alias/dir")
+
+    def test_run_alias_with_directory_invalid(self, mock_conn: Any) -> None:
+        """A non-existent alias directory raises ValueError."""
+        conf: dict[str, str] = {
+            "local_base_path": "/local",
+            "remote_base_path": "/remote",
+            "hostname": "h",
+            "@build": ["make", "/nonexistent"],
+        }
+        mock_conn.run.return_value.stdout = "regular file\n"
+        with pytest.raises(ValueError, match="Directory .* does not exist"):
+            remote_run(mock_conn, conf, "@build", "/local")
+
+    def test_run_list_alias_uses_red_dir_color(
+        self, mocker: MockerFixture, mock_conn: Any
+    ) -> None:
+        """List alias sets fg_dir to 'red' in the styled print output."""
+        conf: dict[str, str] = {
+            "local_base_path": "/local",
+            "remote_base_path": "/remote",
+            "hostname": "h",
+            "@build": ["make", "/custom/build/dir"],
+        }
+        mock_conn.run.return_value.stdout = "directory\n"
+        mock_style = mocker.patch("ropes.lib.actions_remote.style")
+        remote_run(mock_conn, conf, "@build", "/local")
+        mock_style.assert_any_call("h", bold=True, fg="blue")
+        mock_style.assert_any_call("/custom/build/dir", bold=True, fg="red")
+
+    def test_run_string_alias_uses_green_dir_color(
+        self, mocker: MockerFixture, mock_conn: Any
+    ) -> None:
+        """String alias keeps fg_dir as 'green' in the styled print output."""
+        conf: dict[str, str] = {
+            "local_base_path": "/local",
+            "remote_base_path": "/remote",
+            "hostname": "h",
+            "@build": "make",
+        }
+        mock_conn.run.return_value.stdout = "directory\n"
+        mock_style = mocker.patch("ropes.lib.actions_remote.style")
+        remote_run(mock_conn, conf, "@build", "/local")
+        mock_style.assert_any_call("h", bold=True, fg="blue")
+        mock_style.assert_any_call("/remote", bold=True, fg="green")
+
+
+class TestRunCmd:
+    """Tests for _run_cmd: low-level command execution."""
+
+    def test_run_cmd_success(self, mock_conn: Any) -> None:
+        """Zero exit code does not raise."""
+        mock_conn.run.return_value.exited = 0
+        _run_cmd(mock_conn, "echo hi")
+        mock_conn.run.assert_called_once_with("echo hi", warn=True)
+
+    def test_run_cmd_nonzero_exit_raises(self, mock_conn: Any) -> None:
+        """Non-zero exit code raises ValueError with warning message."""
+        mock_conn.run.return_value.exited = 1
+        with pytest.raises(ValueError, match="terminated with exit code 1"):
+            _run_cmd(mock_conn, "failing-cmd")
+
+
+class TestFileExists:
+    """Tests for _file_exists: checking remote file existence."""
+
+    def test_file_exists_true(self, mock_conn: Any) -> None:
+        """Remote file exists: returns True."""
+        mock_conn.run.return_value.ok = True
+        assert _file_exists(mock_conn, "/remote/path/file.txt") is True
+        mock_conn.run.assert_called_once_with("test -f /remote/path/file.txt", warn=True)
+
+    def test_file_exists_false(self, mock_conn: Any) -> None:
+        """Remote file does not exist: returns False."""
+        mock_conn.run.return_value.ok = False
+        assert _file_exists(mock_conn, "/remote/path/file.txt") is False
 
 
 class TestDiffLocalCleanup:
@@ -745,16 +969,28 @@ class TestDiff:
         mocker: MockerFixture,
         mock_conn: Any,
         host_conf: dict[str, str],
+        tmp_path: Path,
     ) -> None:
-        """Custom diff command (e.g. vimdiff) is used in the remote command string."""
+        """Non-diff command forces local mode, downloads files and runs locally."""
         mocker.patch(
             "ropes.lib.actions_remote._construct_path",
             side_effect=["/remote/a.txt", "/remote/b.txt"],
         )
-        diff(mock_conn, host_conf, "path_a", "path_b", "vimdiff", "", False)
-        mock_conn.run.assert_called_once_with(
-            "vimdiff /remote/a.txt /remote/b.txt", pty=True, warn=True
+        mocker.patch("builtins.print")
+        tmp_a = tmp_path / "ropes_a.txt"
+        tmp_b = tmp_path / "ropes_b.txt"
+        mocker.patch("ropes.lib.actions_local.create_tmp_file", side_effect=[tmp_a, tmp_b])
+        mock_fetch = mocker.patch("ropes.lib.actions_remote.remote_fetch")
+        mocker.patch("ropes.lib.actions_local.remove_tmp_file")
+        mock_subprocess = mocker.patch(
+            "ropes.lib.actions_remote.subprocess.run",
+            return_value=mocker.MagicMock(returncode=0),
         )
+        result = diff(mock_conn, host_conf, "path_a", "path_b", "vimdiff", "", local=False)
+        assert result == 0
+        assert mock_fetch.call_count == 2
+        mock_conn.run.assert_not_called()
+        mock_subprocess.assert_called_once_with(["vimdiff", tmp_a, tmp_b], check=False)
 
     def test_diff_remote_custom_args(
         self,
@@ -863,40 +1099,26 @@ class TestDiff:
         )
         mock_subprocess.assert_called_once_with(["meld", "-n", tmp_a, tmp_b], check=False)
 
-    def test_diff_local_first_file_missing(
+    @pytest.mark.parametrize(
+        "fetch_side_effect",
+        [FileNotFoundError, [None, FileNotFoundError]],
+        ids=["first_file_missing", "second_file_missing"],
+    )
+    def test_diff_local_file_missing(
         self,
         mocker: MockerFixture,
         mock_conn: Any,
         host_conf: dict[str, str],
         tmp_path: Path,
+        fetch_side_effect: Any,
     ) -> None:
-        """Local mode: first fetch fails, both temps cleaned, error propagated."""
+        """A failed fetch cleans both temps and propagates the error."""
         tmp_a = tmp_path / "ropes_a.txt"
         tmp_b = tmp_path / "ropes_b.txt"
         mocker.patch("ropes.lib.actions_local.create_tmp_file", side_effect=[tmp_a, tmp_b])
         mocker.patch(
             "ropes.lib.actions_remote.remote_fetch",
-            side_effect=FileNotFoundError,
-        )
-        mock_remove = mocker.patch("ropes.lib.actions_local.remove_tmp_file")
-        with pytest.raises(FileNotFoundError):
-            diff(mock_conn, host_conf, "path_a", "path_b", "diff", "", True)
-        assert mock_remove.call_count == 2
-
-    def test_diff_local_second_file_missing(
-        self,
-        mocker: MockerFixture,
-        mock_conn: Any,
-        host_conf: dict[str, str],
-        tmp_path: Path,
-    ) -> None:
-        """Local mode: second fetch fails, both temps cleaned, error propagated."""
-        tmp_a = tmp_path / "ropes_a.txt"
-        tmp_b = tmp_path / "ropes_b.txt"
-        mocker.patch("ropes.lib.actions_local.create_tmp_file", side_effect=[tmp_a, tmp_b])
-        mocker.patch(
-            "ropes.lib.actions_remote.remote_fetch",
-            side_effect=[None, FileNotFoundError],
+            side_effect=fetch_side_effect,
         )
         mock_remove = mocker.patch("ropes.lib.actions_local.remove_tmp_file")
         with pytest.raises(FileNotFoundError):
