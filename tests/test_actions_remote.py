@@ -282,17 +282,20 @@ class TestLs:
         assert "ls -lAh" in args[0]
         assert "/remote/home/user/project" in args[0]
 
-    def test_ls_unexpected_exit(
+    def test_ls_nonzero_exit(
         self,
         mock_conn: Any,
         host_conf: dict[str, str],
         mocker: MockerFixture,
     ) -> None:
-        """ls handles conn.run failure gracefully without crashing."""
-        mock_conn.run.side_effect = invoke.exceptions.UnexpectedExit(None)
+        """ls propagates ValueError from _run_cmd on non-zero exit."""
+        mock_conn.run.return_value.exited = 2
         mocker.patch("builtins.print")
-        ls(mock_conn, "/home/user/project", host_conf, "-lAh")
-        mock_conn.run.assert_called_once()
+        with pytest.raises(ValueError, match="terminated with exit code 2"):
+            ls(mock_conn, "/home/user/project", host_conf, "-lAh")
+        mock_conn.run.assert_called_once_with(
+            "ls -lAh /remote/home/user/project", warn=True, pty=True
+        )
 
 
 class TestMkdir:
@@ -301,7 +304,7 @@ class TestMkdir:
     def test_mkdir_normal(self, mock_conn: Any, host_conf: dict[str, str]) -> None:
         """Absolute path is translated and passed to mkdir -p."""
         mkdir(mock_conn, host_conf, "/home/user/project/newdir")
-        mock_conn.run.assert_called_once_with("mkdir -p /remote/home/user/project/newdir")
+        mock_conn.run.assert_called_once_with("mkdir -p /remote/home/user/project/newdir", warn=True, pty=False)
 
     def test_mkdir_dot(
         self,
@@ -317,7 +320,7 @@ class TestMkdir:
             return_value="/remote/home/user/project/sub",
         )
         mkdir(mock_conn, host_conf, ".")
-        mock_conn.run.assert_called_once_with("mkdir -p /remote/home/user/project/sub")
+        mock_conn.run.assert_called_once_with("mkdir -p /remote/home/user/project/sub", warn=True, pty=False)
 
     def test_mkdir_unexpected_exit(
         self,
@@ -325,12 +328,12 @@ class TestMkdir:
         host_conf: dict[str, str],
         mocker: MockerFixture,
     ) -> None:
-        """mkdir handles conn.run failure gracefully and prints an error message."""
-        mock_conn.run.side_effect = invoke.exceptions.UnexpectedExit(None)
-        mock_print = mocker.patch("builtins.print")
-        mkdir(mock_conn, host_conf, "/home/user/project/newdir")
-        mock_conn.run.assert_called_once()
-        mock_print.assert_called_once_with("ERROR: cannot create directory!")
+        """mkdir propagates ValueError from _run_cmd on non-zero exit."""
+        mock_conn.run.return_value.exited = 1
+        mocker.patch("builtins.print")
+        with pytest.raises(ValueError, match="terminated with exit code 1"):
+            mkdir(mock_conn, host_conf, "/home/user/project/newdir")
+        mock_conn.run.assert_called_once_with("mkdir -p /remote/home/user/project/newdir", warn=True, pty=False)
 
 
 class TestRsync:
@@ -628,7 +631,7 @@ class TestDeleteFile:
         delete_file(mock_conn, host_conf, "/home/user/project/file.txt")
         assert mock_conn.run.mock_calls == [
             mocker.call("stat -c %F /remote/home/user/project/file.txt", hide=True),
-            mocker.call("rm /remote/home/user/project/file.txt"),
+            mocker.call("rm /remote/home/user/project/file.txt", warn=True, pty=False),
         ]
 
     def test_delete_declined(
@@ -691,7 +694,7 @@ class TestTail:
     ) -> None:
         """tail without -f reads the file and exits."""
         tail(mock_conn, host_conf, False, "/home/user/project/log.txt")
-        mock_conn.run.assert_called_once_with("tail /remote/home/user/project/log.txt", warn=True)
+        mock_conn.run.assert_called_once_with("tail /remote/home/user/project/log.txt", warn=True, pty=False)
 
     def test_tail_follow(
         self,
@@ -700,7 +703,7 @@ class TestTail:
     ) -> None:
         """tail -f follows the file and streams new content."""
         tail(mock_conn, host_conf, True, "/home/user/project/log.txt")
-        mock_conn.run.assert_called_once_with("tail -f /remote/home/user/project/log.txt", warn=True)
+        mock_conn.run.assert_called_once_with("tail -f /remote/home/user/project/log.txt", warn=True, pty=False)
 
     def test_tail_remote_failure(
         self,
@@ -731,7 +734,7 @@ class TestCopy:
             "/home/user/project/dst.txt",
         )
         mock_conn.run.assert_called_once_with(
-            "cp /remote/home/user/project/src.txt /remote/home/user/project/dst.txt", warn=True
+            "cp /remote/home/user/project/src.txt /remote/home/user/project/dst.txt", warn=True, pty=False
         )
 
     def test_copy_remote_failure(
@@ -760,7 +763,7 @@ class TestRun:
         """A plain command is executed after the directory is verified."""
         mock_conn.run.return_value.stdout = "directory\n"
         remote_run(mock_conn, host_conf, "echo hello", "/home/user/project")
-        mock_conn.run.assert_called_with("echo hello", warn=True)
+        mock_conn.run.assert_called_with("echo hello", warn=True, pty=False)
 
     def test_run_with_alias(self, mock_conn: Any) -> None:
         """An @-prefixed command is resolved from host_conf and executed."""
@@ -772,7 +775,7 @@ class TestRun:
         }
         mock_conn.run.return_value.stdout = "directory\n"
         remote_run(mock_conn, conf, "@build", "/local")
-        mock_conn.run.assert_called_with("make && make install", warn=True)
+        mock_conn.run.assert_called_with("make && make install", warn=True, pty=False)
 
     def test_run_unknown_alias(
         self,
@@ -816,7 +819,7 @@ class TestRun:
         }
         mock_conn.run.return_value.stdout = "directory\n"
         remote_run(mock_conn, conf, "@build", "/local")
-        mock_conn.run.assert_called_with("make", warn=True)
+        mock_conn.run.assert_called_with("make", warn=True, pty=False)
         mock_conn.cd.assert_called_once_with("/custom/build/dir")
 
     def test_run_alias_with_directory_overrides_argument(self, mock_conn: Any) -> None:
@@ -883,7 +886,7 @@ class TestRunCmd:
         """Zero exit code does not raise."""
         mock_conn.run.return_value.exited = 0
         _run_cmd(mock_conn, "echo hi")
-        mock_conn.run.assert_called_once_with("echo hi", warn=True)
+        mock_conn.run.assert_called_once_with("echo hi", warn=True, pty=False)
 
     def test_run_cmd_nonzero_exit_raises(self, mock_conn: Any) -> None:
         """Non-zero exit code raises ValueError with warning message."""
