@@ -76,6 +76,7 @@ def remote_fetch(
     host_conf: dict[str, Any],
     path: str,
     temp_path: pathlib.Path,
+    *,
     confirm_overwrite: bool = True,
 ):
     """Download a remote file to a local path.
@@ -115,7 +116,7 @@ def remote_fetch(
         conn.get(remote_path, str(temp_path.absolute()))
     except FileNotFoundError as exc:
         raise FileNotFoundError(
-            f"Could not find file {remote_path} on host {host_conf["hostname"]}"
+            f"ERROR: Could not find file {remote_path} on host {host_conf["hostname"]}"
         ) from exc
 
     if not os.path.isfile(temp_path):
@@ -127,6 +128,7 @@ def remote_put(
     host_conf: dict[str, Any],
     path: str,
     local_path: pathlib.Path,
+    *,
     confirm_overwrite: bool = True,
 ):
     """Upload a local file to a remote path.

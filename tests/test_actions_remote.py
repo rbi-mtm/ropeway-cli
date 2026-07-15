@@ -1,4 +1,5 @@
 """Collection of tests for actions_remote.py"""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -12,8 +13,8 @@ from ropes.lib.actions_remote import _construct_path
 from ropes.lib.actions_remote import _diff_local_cleanup
 from ropes.lib.actions_remote import _file_exists
 from ropes.lib.actions_remote import _get_file_type
-from ropes.lib.actions_remote import _run_cmd
 from ropes.lib.actions_remote import _rsync
+from ropes.lib.actions_remote import _run_cmd
 from ropes.lib.actions_remote import compress
 from ropes.lib.actions_remote import copy as remote_copy
 from ropes.lib.actions_remote import delete_file
@@ -210,7 +211,9 @@ class TestRemotePut:
     ) -> None:
         """Successful upload: path translation and conn.put call."""
         src = tmp_path / "local.txt"
-        remote_put(mock_conn, host_conf, "/home/user/project/remote.txt", src, False)
+        remote_put(
+            mock_conn, host_conf, "/home/user/project/remote.txt", src, confirm_overwrite=False
+        )
         mock_conn.put.assert_called_once()
 
     def test_local_file_not_found(
@@ -223,7 +226,9 @@ class TestRemotePut:
         mock_conn.put.side_effect = FileNotFoundError
         src = tmp_path / "missing.txt"
         with pytest.raises(FileNotFoundError, match="Could not find file"):
-            remote_put(mock_conn, host_conf, "/home/user/project/remote.txt", src, False)
+            remote_put(
+                mock_conn, host_conf, "/home/user/project/remote.txt", src, confirm_overwrite=False
+            )
 
     def test_put_overwrite_declined(
         self,
@@ -304,7 +309,9 @@ class TestMkdir:
     def test_mkdir_normal(self, mock_conn: Any, host_conf: dict[str, str]) -> None:
         """Absolute path is translated and passed to mkdir -p."""
         mkdir(mock_conn, host_conf, "/home/user/project/newdir")
-        mock_conn.run.assert_called_once_with("mkdir -p /remote/home/user/project/newdir", warn=True, pty=False)
+        mock_conn.run.assert_called_once_with(
+            "mkdir -p /remote/home/user/project/newdir", warn=True, pty=False
+        )
 
     def test_mkdir_dot(
         self,
@@ -320,7 +327,9 @@ class TestMkdir:
             return_value="/remote/home/user/project/sub",
         )
         mkdir(mock_conn, host_conf, ".")
-        mock_conn.run.assert_called_once_with("mkdir -p /remote/home/user/project/sub", warn=True, pty=False)
+        mock_conn.run.assert_called_once_with(
+            "mkdir -p /remote/home/user/project/sub", warn=True, pty=False
+        )
 
     def test_mkdir_unexpected_exit(
         self,
@@ -333,7 +342,9 @@ class TestMkdir:
         mocker.patch("builtins.print")
         with pytest.raises(ValueError, match="terminated with exit code 1"):
             mkdir(mock_conn, host_conf, "/home/user/project/newdir")
-        mock_conn.run.assert_called_once_with("mkdir -p /remote/home/user/project/newdir", warn=True, pty=False)
+        mock_conn.run.assert_called_once_with(
+            "mkdir -p /remote/home/user/project/newdir", warn=True, pty=False
+        )
 
 
 class TestRsync:
@@ -508,7 +519,6 @@ class TestFind:
         mock_conn.run.side_effect = invoke.exceptions.UnexpectedExit(None)
         with pytest.raises(invoke.exceptions.UnexpectedExit):
             find(mock_conn, host_conf, "find", "")
-
 
 
 class TestRealpath:
@@ -694,7 +704,9 @@ class TestTail:
     ) -> None:
         """tail without -f reads the file and exits."""
         tail(mock_conn, host_conf, False, "/home/user/project/log.txt")
-        mock_conn.run.assert_called_once_with("tail /remote/home/user/project/log.txt", warn=True, pty=False)
+        mock_conn.run.assert_called_once_with(
+            "tail /remote/home/user/project/log.txt", warn=True, pty=False
+        )
 
     def test_tail_follow(
         self,
@@ -703,7 +715,9 @@ class TestTail:
     ) -> None:
         """tail -f follows the file and streams new content."""
         tail(mock_conn, host_conf, True, "/home/user/project/log.txt")
-        mock_conn.run.assert_called_once_with("tail -f /remote/home/user/project/log.txt", warn=True, pty=False)
+        mock_conn.run.assert_called_once_with(
+            "tail -f /remote/home/user/project/log.txt", warn=True, pty=False
+        )
 
     def test_tail_remote_failure(
         self,
@@ -734,7 +748,9 @@ class TestCopy:
             "/home/user/project/dst.txt",
         )
         mock_conn.run.assert_called_once_with(
-            "cp /remote/home/user/project/src.txt /remote/home/user/project/dst.txt", warn=True, pty=False
+            "cp /remote/home/user/project/src.txt /remote/home/user/project/dst.txt",
+            warn=True,
+            pty=False,
         )
 
     def test_copy_remote_failure(
@@ -846,9 +862,7 @@ class TestRun:
         with pytest.raises(ValueError, match="Directory .* does not exist"):
             remote_run(mock_conn, conf, "@build", "/local")
 
-    def test_run_list_alias_uses_red_dir_color(
-        self, mocker: MockerFixture, mock_conn: Any
-    ) -> None:
+    def test_run_list_alias_uses_red_dir_color(self, mocker: MockerFixture, mock_conn: Any) -> None:
         """List alias sets fg_dir to 'red' in the styled print output."""
         conf: dict[str, str] = {
             "local_base_path": "/local",

@@ -16,6 +16,9 @@
 It uses [Fabric](https://www.fabfile.org/) under the hood and provides a
 convenient Click-based interface for common remote file tasks.
 
+> **⚠ Warning:** ROPES executes commands on remote machines via SSH.
+> Use it at your own risk. It has only been tested on Linux (local) communicating with Linux hosts.
+
 ## Features
 
 - **ls** — List remote directory contents

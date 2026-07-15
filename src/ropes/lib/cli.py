@@ -33,7 +33,7 @@ from .default import THEME
 
 @click.group(
     "cli",
-    context_settings={"help_option_names": ["-h", "--help"]},
+    context_settings={"help_option_names": ["-h", "--help"], 'show_default': True},
     invoke_without_command=True,
 )
 @click.pass_context
@@ -52,6 +52,7 @@ def cli(ctx, host: str):
     established, both stored in the Click context for use by
     subcommands.
     """
+
     if ctx.invoked_subcommand is None:
         click.echo(ctx.get_help())
 
@@ -103,7 +104,15 @@ def view(ctx, path, editor, write, new):
     tmp_path = actions_local.create_tmp_file(suffix)
 
     if not new:
-        actions_remote.remote_fetch(ctx.obj["conn"], ctx.obj["host_conf"], path, tmp_path)
+        try:
+            # confirm_overwrite=False is safe here because path is always downloaded to a tmp file
+            actions_remote.remote_fetch(
+                ctx.obj["conn"], ctx.obj["host_conf"], path, tmp_path, confirm_overwrite=False
+            )
+        except FileNotFoundError as exc:
+            click.echo(click.style(exc, fg="red", bg="white"))
+            actions_local.remove_tmp_file(tmp_path)
+            return
 
     actions_local.edit_file(tmp_path, editor)
     if write or new:
@@ -256,7 +265,7 @@ def compress(ctx, use, exclude, only_cwd):
     if excl := exclude.split():
         for e in excl:
             flag = "-a -not -name"
-            if e.endswith("/"):
+            if e.endswith("/*"):
                 flag = "-a -not -wholename "
             find_args += flag + f" '{e}' "
     click.echo(find_args)

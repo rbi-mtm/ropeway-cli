@@ -72,6 +72,16 @@ class TestLsCommand:
         assert result.exit_code == 0
         assert mock_ls.call_args[0][1] == "."  # path
 
+    def test_ls_value_error(self, mocker: MockerFixture, mock_conn: Any) -> None:
+        """ls catches ValueError and prints styled error."""
+        mocker.patch(
+            "ropes.lib.cli.actions_remote.ls",
+            side_effect=ValueError("Invalid path"),
+        )
+        result = _invoke(mocker, mock_conn, ["ls", "/bad/path"])
+        assert result.exit_code == 0
+        assert "Invalid path" in result.output
+
 
 class TestPutCommand:
     def test_put_command(
@@ -157,6 +167,33 @@ class TestFindCommand:
         lines = [l for l in result.output.splitlines() if l.strip()]
         assert len(lines) == 2
 
+    def test_find_full_path_and_show_type(self, mocker: MockerFixture, mock_conn: Any) -> None:
+        """find --full-path --show-type uses realpath (full-path takes precedence)."""
+        mocker.patch(
+            "ropes.lib.cli.actions_remote.find",
+            return_value=["file1.py"],
+        )
+        mock_realpath = mocker.patch(
+            "ropes.lib.cli.actions_remote.realpath",
+            return_value="/remote/file1.py",
+        )
+        mocker.patch("ropes.lib.cli.actions_remote._get_file_type", return_value="regular file")
+        mocker.patch("ropes.lib.cli.actions_remote._construct_path", return_value="/remote/file1.py")
+        result = _invoke(mocker, mock_conn, ["find", "--full-path", "--show-type", "*.py"])
+        assert result.exit_code == 0
+        mock_realpath.assert_called_once()
+        assert "/remote/file1.py" in result.output
+
+    def test_find_custom_use_and_args(self, mocker: MockerFixture, mock_conn: Any) -> None:
+        """find --use and --args are forwarded."""
+        mock_find = mocker.patch(
+            "ropes.lib.cli.actions_remote.find",
+            return_value=None,
+        )
+        result = _invoke(mocker, mock_conn, ["find", "--use", "find", "--args", "-name", "*.py"])
+        assert result.exit_code == 0
+        mock_find.assert_called_once_with(mock_conn, mock_find.call_args[0][1], "find", "-name", "*.py")
+
 
 class TestMkdirCommand:
     def test_mkdir_command(self, mocker: MockerFixture, mock_conn: Any) -> None:
@@ -164,6 +201,16 @@ class TestMkdirCommand:
         result = _invoke(mocker, mock_conn, ["mkdir", "/remote/path"])
         assert result.exit_code == 0
         mock_mkdir.assert_called_once_with(mock_conn, mock_mkdir.call_args[0][1], "/remote/path")
+
+    def test_mkdir_value_error(self, mocker: MockerFixture, mock_conn: Any) -> None:
+        """mkdir catches ValueError and prints styled error."""
+        mocker.patch(
+            "ropes.lib.cli.actions_remote.mkdir",
+            side_effect=ValueError("Permission denied"),
+        )
+        result = _invoke(mocker, mock_conn, ["mkdir", "/restricted/path"])
+        assert result.exit_code == 0
+        assert "Permission denied" in result.output
 
 
 class TestRealpathCommand:
@@ -210,6 +257,16 @@ class TestDeleteCommand:
         result: Result = runner.invoke(cli, ["-H", "myhost", "delete", "/remote/file.txt"])
         assert result.exit_code == 0
 
+    def test_delete_value_error(self, mocker: MockerFixture, mock_conn: Any) -> None:
+        """delete catches ValueError and prints styled error."""
+        mocker.patch(
+            "ropes.lib.cli.actions_remote.delete_file",
+            side_effect=ValueError("File is a directory"),
+        )
+        result = _invoke(mocker, mock_conn, ["delete", "/remote/dir"])
+        assert result.exit_code == 0
+        assert "File is a directory" in result.output
+
 
 class TestRunCommand:
     def test_run_command(self, mocker: MockerFixture, mock_conn: Any) -> None:
@@ -252,6 +309,22 @@ class TestRunCommand:
         result = _invoke(mocker, mock_conn, ["run", "-D", "/custom/dir", "echo hi"])
         assert result.exit_code == 0
         assert mock_run.call_args[0][3] == "/custom/dir"  # directory
+
+    def test_run_no_aliases(self, mocker: MockerFixture, mock_conn: Any) -> None:
+        """run with no command and no @-prefixed keys prints nothing."""
+        mocker.patch(
+            "ropes.lib.cli.actions_local.load_host",
+            return_value={
+                "local_base_path": "/local",
+                "remote_base_path": "/remote",
+                "hostname": "myhost",
+            },
+        )
+        mocker.patch("ropes.lib.cli.fabric.Connection", return_value=mock_conn)
+        runner = CliRunner()
+        result: Result = runner.invoke(cli, ["-H", "myhost", "run"])
+        assert result.exit_code == 0
+        assert result.output.strip() == ""
 
 
 class TestViewCommand:
@@ -306,6 +379,40 @@ class TestViewCommand:
         mock_put.assert_called_once()
         mock_remove.assert_called_once_with(tmp)
 
+    def test_view_file_not_found(
+        self, mocker: MockerFixture, mock_conn: Any, tmp_path: Path
+    ) -> None:
+        """FileNotFoundError on fetch prints error and returns early."""
+        tmp = tmp_path / "view_tmp.txt"
+        mocker.patch("ropes.lib.cli.actions_local.determine_suffix", return_value=".txt")
+        mocker.patch("ropes.lib.cli.actions_local.create_tmp_file", return_value=tmp)
+        mocker.patch("ropes.lib.cli.actions_local.edit_file")
+        mocker.patch(
+            "ropes.lib.cli.actions_remote.remote_fetch",
+            side_effect=FileNotFoundError("No such file: remote.txt"),
+        )
+        mock_put = mocker.patch("ropes.lib.cli.actions_remote.remote_put")
+        mock_remove = mocker.patch("ropes.lib.cli.actions_local.remove_tmp_file")
+        result = _invoke(mocker, mock_conn, ["view", "remote.txt"])
+        assert result.exit_code == 0
+        assert "No such file: remote.txt" in result.output
+        mock_put.assert_not_called()
+        mock_remove.assert_called_once()
+
+    def test_view_with_editor(
+        self, mocker: MockerFixture, mock_conn: Any, tmp_path: Path
+    ) -> None:
+        """--editor option is forwarded to edit_file."""
+        tmp = tmp_path / "view_tmp.txt"
+        mocker.patch("ropes.lib.cli.actions_local.determine_suffix", return_value=".txt")
+        mocker.patch("ropes.lib.cli.actions_local.create_tmp_file", return_value=tmp)
+        mock_edit = mocker.patch("ropes.lib.cli.actions_local.edit_file")
+        mocker.patch("ropes.lib.cli.actions_remote.remote_fetch")
+        mocker.patch("ropes.lib.cli.actions_local.remove_tmp_file")
+        result = _invoke(mocker, mock_conn, ["view", "--editor", "vim", "file.txt"])
+        assert result.exit_code == 0
+        mock_edit.assert_called_once_with(tmp, "vim")
+
 
 class TestGetCommand:
     def test_get_command(self, mocker: MockerFixture, mock_conn: Any) -> None:
@@ -324,6 +431,16 @@ class TestCpCommand:
         result = _invoke(mocker, mock_conn, ["cp", "src.txt", "dst.txt"])
         assert result.exit_code == 0
         mock_copy.assert_called_once()
+
+    def test_cp_value_error(self, mocker: MockerFixture, mock_conn: Any) -> None:
+        """cp catches ValueError and prints styled error."""
+        mocker.patch(
+            "ropes.lib.cli.actions_remote.copy",
+            side_effect=ValueError("Source not found"),
+        )
+        result = _invoke(mocker, mock_conn, ["cp", "missing.txt", "dst.txt"])
+        assert result.exit_code == 0
+        assert "Source not found" in result.output
 
 
 class TestTailCommand:
@@ -389,6 +506,13 @@ class TestDiffCommand:
         assert result.exit_code == 0
         assert mock_diff.call_args[0][4] == "vimdiff"  # diff_cmd
 
+    def test_diff_custom_args(self, mocker: MockerFixture, mock_conn: Any) -> None:
+        """--args flag forwards extra diff arguments."""
+        mock_diff = mocker.patch("ropes.lib.cli.actions_remote.diff", return_value=0)
+        result = _invoke(mocker, mock_conn, ["diff", "--args", "-u", "a.txt", "b.txt"])
+        assert result.exit_code == 0
+        assert mock_diff.call_args[0][5] == "-u"  # diff_args
+
 
 class TestSyncCwdCommand:
     def test_sync_push(self, mocker: MockerFixture, mock_conn: Any) -> None:
@@ -405,6 +529,13 @@ class TestSyncCwdCommand:
         result = _invoke(mocker, mock_conn, ["sync-cwd", "--from"])
         assert result.exit_code == 0
         assert mock_sync.call_args[0][3] is True  # from_remote=True
+
+    def test_sync_custom_args(self, mocker: MockerFixture, mock_conn: Any) -> None:
+        """Custom --args are forwarded to sync_cwd."""
+        mock_sync = mocker.patch("ropes.lib.cli.actions_remote.sync_cwd")
+        result = _invoke(mocker, mock_conn, ["sync-cwd", "--args", "-avz"])
+        assert result.exit_code == 0
+        assert mock_sync.call_args[0][2] == "-avz"  # rsync_args
 
 
 class TestCompressCommand:
@@ -434,3 +565,34 @@ class TestCompressCommand:
         result = _invoke(mocker, mock_conn, ["compress"])
         assert result.exit_code == 0
         mock_compress.assert_not_called()
+
+    def test_compress_exclude_files_in_dir(self, mocker: MockerFixture, mock_conn: Any) -> None:
+        """Exclude patterns ending with '/' use -wholename instead of -name."""
+        mock_find = mocker.patch("ropes.lib.cli.actions_remote.find", return_value=None)
+        result = _invoke(
+            mocker, mock_conn, ["compress", "--exclude", "*/Input/*"]
+        )
+        assert result.exit_code == 0
+        find_args = mock_find.call_args[0][3]
+        assert "-wholename" in find_args
+
+    def test_compress_custom_use(self, mocker: MockerFixture, mock_conn: Any) -> None:
+        """--use flag selects a custom compressor."""
+        mocker.patch(
+            "ropes.lib.cli.actions_remote.find",
+            return_value=["file1.dat"],
+        )
+        mock_compress = mocker.patch("ropes.lib.cli.actions_remote.compress")
+        result = _invoke(mocker, mock_conn, ["compress", "--use", "gzip"])
+        assert result.exit_code == 0
+        mock_compress.assert_called_once()
+        assert mock_compress.call_args[0][2] == "gzip"  # use
+
+    def test_compress_empty_exclude(self, mocker: MockerFixture, mock_conn: Any) -> None:
+        """Empty --exclude produces no exclusion flags."""
+        mock_find = mocker.patch("ropes.lib.cli.actions_remote.find", return_value=None)
+        result = _invoke(mocker, mock_conn, ["compress", "--exclude", ""])
+        assert result.exit_code == 0
+        find_args = mock_find.call_args[0][3]
+        assert "-name" not in find_args
+        assert "-wholename" not in find_args
