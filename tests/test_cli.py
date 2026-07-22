@@ -326,6 +326,27 @@ class TestRunCommand:
         assert result.exit_code == 0
         assert result.output.strip() == ""
 
+    def test_run_list_multiple_aliases(self, mocker: MockerFixture, mock_conn: Any) -> None:
+        """run with no cmd lists all @-prefixed aliases, skipping non-alias keys."""
+        mocker.patch(
+            "ropes.lib.cli.actions_local.load_host",
+            return_value={
+                "local_base_path": "/local",
+                "remote_base_path": "/remote",
+                "hostname": "myhost",
+                "@build": "make",
+                "@test": "pytest",
+                "regular_key": "val",
+            },
+        )
+        mocker.patch("ropes.lib.cli.fabric.Connection", return_value=mock_conn)
+        runner = CliRunner()
+        result: Result = runner.invoke(cli, ["-H", "myhost", "run"])
+        assert result.exit_code == 0
+        assert "@build" in result.output
+        assert "@test" in result.output
+        assert "regular_key" not in result.output
+
 
 class TestViewCommand:
     def test_view_no_flags(
@@ -596,3 +617,26 @@ class TestCompressCommand:
         find_args = mock_find.call_args[0][3]
         assert "-name" not in find_args
         assert "-wholename" not in find_args
+
+    def test_compress_deduplicates_files(self, mocker: MockerFixture, mock_conn: Any) -> None:
+        """Duplicate filenames from find are deduplicated via set()."""
+        mocker.patch(
+            "ropes.lib.cli.actions_remote.find",
+            return_value=["file.dat", "file.dat", "other.dat"],
+        )
+        mock_compress = mocker.patch("ropes.lib.cli.actions_remote.compress")
+        result = _invoke(mocker, mock_conn, ["compress"])
+        assert result.exit_code == 0
+        passed_files = mock_compress.call_args[0][3]
+        assert len(passed_files) == 2
+
+    def test_compress_mixed_exclude_patterns(self, mocker: MockerFixture, mock_conn: Any) -> None:
+        """Mix of file and directory exclude patterns produces correct -name and -wholename flags."""
+        mock_find = mocker.patch("ropes.lib.cli.actions_remote.find", return_value=None)
+        result = _invoke(mocker, mock_conn, ["compress", "--exclude", "*png */Input/* *jpg"])
+        assert result.exit_code == 0
+        find_args = mock_find.call_args[0][3]
+        assert "-name '*png'" in find_args
+        assert "-wholename " in find_args
+        assert "'*/Input/*'" in find_args
+        assert "-name '*jpg'" in find_args

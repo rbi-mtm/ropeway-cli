@@ -499,6 +499,22 @@ class TestFind:
         assert result is None
         mock_conn.run.assert_called_once_with("find . ", hide=True)
 
+    def test_find_with_expr_and_find_backend_warns(
+        self,
+        mocker: MockerFixture,
+        mock_conn: Any,
+        host_conf: dict[str, str],
+    ) -> None:
+        """Non-empty expr with 'find' backend prints a warning (expr is ignored)."""
+        mocker.patch("ropes.lib.actions_remote._construct_path", return_value="/remote/root")
+        mock_print = mocker.patch("builtins.print")
+        mock_conn.run.return_value.stdout = "some/file.py\n"
+        result = find(mock_conn, host_conf, "find", "-name '*.py'", expr="*.py")
+        assert result == ["some/file.py", ""]
+        mock_print.assert_called_once()
+        printed_msg = mock_print.call_args[0][0]
+        assert "EXPR argument not used with 'find'" in printed_msg
+
     def test_find_not_implemented(
         self,
         mock_conn: Any,

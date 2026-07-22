@@ -33,7 +33,7 @@ from .default import THEME
 
 @click.group(
     "cli",
-    context_settings={"help_option_names": ["-h", "--help"], 'show_default': True},
+    context_settings={"help_option_names": ["-h", "--help"], "show_default": True},
     invoke_without_command=True,
 )
 @click.pass_context

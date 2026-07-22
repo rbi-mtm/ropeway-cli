@@ -200,3 +200,14 @@ class TestConstructLocalPath:
         }
         result = construct_local_path("/remote/proj/file.txt", host_conf)
         assert result == pathlib.Path("/home/user/proj/file.txt")
+
+
+class TestDefaultConfig:
+    """Tests for default.py: verifying configuration constants."""
+
+    def test_host_config_is_absolute_expanded_path(self) -> None:
+        """HOST_CONFIG is an absolute path with ~ fully expanded."""
+        from ropes.lib.default import HOST_CONFIG
+
+        assert os.path.isabs(HOST_CONFIG)
+        assert "~" not in HOST_CONFIG
