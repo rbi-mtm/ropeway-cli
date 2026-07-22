@@ -330,6 +330,14 @@ def find(
     with conn.cd(remote_path):
         match find_cmd:
             case "find":
+                if expr:
+                    print(
+                        style(
+                            "WARNING: EXPR argument not used with 'find'! Use --args instead!",
+                            fg="red",
+                            bg="white",
+                        )
+                    )
                 results = conn.run(f"find . {find_args}", hide=True)
             case "fd" | "rust_find":
                 results = conn.run(f"fd {find_args} {expr} .", hide=True)
