@@ -21,6 +21,8 @@
 
 """CLI definitions for refops using rich-click."""
 
+import pathlib
+
 import fabric
 import rich_click as click
 
@@ -52,6 +54,17 @@ def cli(ctx, host: str):
     established, both stored in the Click context for use by
     subcommands.
     """
+
+    if not pathlib.Path(HOST_CONFIG).exists():
+        click.echo(
+            click.style(
+                f"ERROR: {HOST_CONFIG} does not exist!"
+                " Create proper file (see README.md) and run refops again!",
+                fg="red",
+                bg="white",
+            )
+        )
+        return
 
     if ctx.invoked_subcommand is None:
         click.echo(ctx.get_help())

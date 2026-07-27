@@ -65,7 +65,9 @@ environment.
 
 ## Configuration
 
-Create `~/.config/refops/hosts.json` with one entry per remote host:
+Create `~/.config/refops/hosts.json` with one entry per remote host.
+The host name (e.g. `"mycluster"`) must match a host defined in your
+`~/.ssh/config` file.
 
 ```json
 {
