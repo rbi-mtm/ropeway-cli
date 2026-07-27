@@ -7,6 +7,7 @@ from click.testing import CliRunner
 from click.testing import Result
 from pytest_mock import MockerFixture
 
+import refops.lib.cli
 from refops.lib.cli import cli
 
 # --- Helper to reduce boilerplate ---
@@ -39,6 +40,19 @@ class TestCliHelp:
         result: Result = runner.invoke(cli, ["-H", "myhost"])
         assert result.exit_code == 0
         assert "refops: REmote File Operations via Ssh" in result.output
+
+    def test_missing_hosts_file(self, mocker: MockerFixture) -> None:
+        """When HOST_CONFIG does not exist, an error is shown and the CLI returns early."""
+        mocker.patch("refops.lib.cli.pathlib.Path")
+        refops.lib.cli.pathlib.Path.return_value.exists.return_value = False
+        mock_load = mocker.patch("refops.lib.cli.actions_local.load_host")
+        mock_conn_cls = mocker.patch("refops.lib.cli.fabric.Connection")
+        runner = CliRunner()
+        result: Result = runner.invoke(cli, ["-H", "myhost"])
+        assert result.exit_code == 0
+        assert "does not exist" in result.output
+        mock_load.assert_not_called()
+        mock_conn_cls.assert_not_called()
 
 
 class TestLsCommand:
