@@ -19,7 +19,7 @@
 #  MA 02110-1301, USA.
 #
 
-"""CLI definitions for ROPES using rich-click."""
+"""CLI definitions for refops using rich-click."""
 
 import fabric
 import rich_click as click
@@ -40,7 +40,7 @@ from .default import THEME
 @click.rich_config(help_config={"theme": THEME, "max_width": HELP_MAX_WIDTH})
 @click.option("-H", "--host", required=True)
 def cli(ctx, host: str):
-    """ROPES: Remote file OPErations via Ssh
+    """refops: REmote File Operations via Ssh
 
     This is a collection of commands used for remote file operations.
     It leverages the fabric module to perform file actions on a remote
@@ -48,7 +48,7 @@ def cli(ctx, host: str):
 
     When invoked without a subcommand the help screen is displayed.
     On successful invocation the host configuration is loaded from
-    ``~/.config/ropes/hosts.json`` and a Fabric SSH connection is
+    ``~/.config/refops/hosts.json`` and a Fabric SSH connection is
     established, both stored in the Click context for use by
     subcommands.
     """

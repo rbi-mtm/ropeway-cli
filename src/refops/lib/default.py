@@ -21,11 +21,11 @@
 #
 #
 
-"""Default configuration values for the ropes CLI."""
+"""Default configuration values for the refops CLI."""
 
 import os
 
 THEME = "solarized-box"  # Theme for CLI (see rich-click documentation for alternatives)
 HELP_MAX_WIDTH = 80  # Maximum width (in characters) of help messages
 
-HOST_CONFIG = os.path.expanduser("~/.config/ropes/hosts.json")
+HOST_CONFIG = os.path.expanduser("~/.config/refops/hosts.json")

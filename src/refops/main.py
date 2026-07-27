@@ -25,7 +25,7 @@
 
 import sys
 
-from ropes.lib import cli
+from refops.lib import cli
 
 
 def main():

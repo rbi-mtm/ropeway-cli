@@ -1,22 +1,22 @@
 ```
-    ____  ____  ____  ___________
-   / __ \/ __ \/ __ \/ ____/ ___/
-  / /_/ / / / / /_/ / __/  \__ \
- / _, _/ /_/ / ____/ /___ ___/ /
-/_/ |_|\____/_/   /_____//____/
+              ____                
+   ________  / __/___  ____  _____
+  / ___/ _ \/ /_/ __ \/ __ \/ ___/
+ / /  /  __/ __/ /_/ / /_/ (__  ) 
+/_/   \___/_/  \____/ .___/____/  
+                   /_/             
 
-
-         Remote file OPErations via Ssh
+         REmote File Operations via Ssh
 
 ```
 
-# ROPES
+# refops
 
-**ROPES** is a command-line tool for performing remote file operations over SSH.
+**refops** is a command-line tool for performing remote file operations over SSH.
 It uses [Fabric](https://www.fabfile.org/) under the hood and provides a
 convenient Click-based interface for common remote file tasks.
 
-> **⚠ Warning:** ROPES executes commands on remote machines via SSH.
+> **⚠ Warning:** refops executes commands on remote machines via SSH.
 > Use it at your own risk. It has only been tested on Linux (local) communicating with Linux hosts.
 
 ## Features
@@ -43,8 +43,8 @@ from source.
 ### Using `uv` (recommended)
 
 ```bash
-git clone https://github.com/bernik86/ropes.git
-cd ropes
+git clone https://github.com/bernik86/refops.git
+cd refops
 uv venv
 source .venv/bin/activate
 uv pip install .
@@ -53,19 +53,19 @@ uv pip install .
 ### Using `pip`
 
 ```bash
-git clone https://github.com/bernik86/ropes.git
-cd ropes
+git clone https://github.com/bernik86/refops.git
+cd refops
 python3 -m venv .venv
 source .venv/bin/activate
 pip install .
 ```
 
-After either method, the `ropes` command is available inside the virtual
+After either method, the `refops` command is available inside the virtual
 environment.
 
 ## Configuration
 
-Create `~/.config/ropes/hosts.json` with one entry per remote host:
+Create `~/.config/refops/hosts.json` with one entry per remote host:
 
 ```json
 {
@@ -87,7 +87,7 @@ Create `~/.config/ropes/hosts.json` with one entry per remote host:
 ## Usage
 
 ```
-ropes -H <host> <command> [options] [args]
+refops -H <host> <command> [options] [args]
 ```
 
 The `-H` / `--host` flag is **required** and must match a key in
@@ -116,70 +116,70 @@ The `-H` / `--host` flag is **required** and must match a key in
 
 ```bash
 # List remote directory
-ropes -H mycluster ls /remote/path
+refops -H mycluster ls /remote/path
 
 # Edit a remote file locally and write changes back
-ropes -H mycluster view /remote/path/file.txt --write
+refops -H mycluster view /remote/path/file.txt --write
 
 # Create a new file on the remote host
-ropes -H mycluster view /remote/path/new.txt --new
+refops -H mycluster view /remote/path/new.txt --new
 
 # Download a file
-ropes -H mycluster get /remote/path/file.txt
+refops -H mycluster get /remote/path/file.txt
 
 # Upload a file
-ropes -H mycluster put /local/path/file.txt
+refops -H mycluster put /local/path/file.txt
 
 # Sync current directory to remote
-ropes -H mycluster sync_cwd
+refops -H mycluster sync_cwd
 
 # Sync from remote to local
-ropes -H mycluster sync_cwd --from
+refops -H mycluster sync_cwd --from
 
 # Find Python files (uses fd by default; install fd on the remote host)
 # See https://github.com/sharkdp/fd
-ropes -H mycluster find -e py
-ropes -H mycluster find -e py --full-path --show-type
+refops -H mycluster find -e py
+refops -H mycluster find -e py --full-path --show-type
 
 # Use find backend explicitly
-ropes -H mycluster find --use find --args "-maxdepth 3 -name '*.py'"
+refops -H mycluster find --use find --args "-maxdepth 3 -name '*.py'"
 
 # Compress files with gzip, excluding images
-ropes -H mycluster compress --use gzip --exclude "*png *jpg"
+refops -H mycluster compress --use gzip --exclude "*png *jpg"
 
 # Tail a remote log
-ropes -H mycluster tail /remote/path/log.txt
-ropes -H mycluster tail -f /remote/path/log.txt
+refops -H mycluster tail /remote/path/log.txt
+refops -H mycluster tail -f /remote/path/log.txt
 
 # Copy a file on the remote host
-ropes -H mycluster cp /remote/path/file.txt /remote/path/file.bak
+refops -H mycluster cp /remote/path/file.txt /remote/path/file.bak
 
 # Run a command or alias
-ropes -H mycluster run "ls -la /tmp"
-ropes -H mycluster run @mycommand
-ropes -H mycluster run @build
+refops -H mycluster run "ls -la /tmp"
+refops -H mycluster run @mycommand
+refops -H mycluster run @build
 
 # Compare two remote files (default: remote diff)
-ropes -H mycluster diff /remote/path/a.txt /remote/path/b.txt
+refops -H mycluster diff /remote/path/a.txt /remote/path/b.txt
 
 # Compare using a custom diff tool
-ropes -H mycluster diff /remote/path/a.txt /remote/path/b.txt --use vimdiff
+refops -H mycluster diff /remote/path/a.txt /remote/path/b.txt --use vimdiff
 
 # Download and compare locally
-ropes -H mycluster diff /remote/path/a.txt /remote/path/b.txt --local
+refops -H mycluster diff /remote/path/a.txt /remote/path/b.txt --local
 ```
 
 ## Path Mapping
 
-ROPES automatically translates paths between local and remote machines.
+refops automatically translates paths between local and remote machines.
 When a **relative** path is given, `local_base_path` in the current working
 directory is replaced by `remote_base_path` (or vice versa).  Absolute
 paths are used as-is.
 
 For example, with the config above:
-- `ropes -H mycluster ls .` from `/home/user/projects/foo` lists
+- `refops -H mycluster ls .` from `/home/user/projects/foo` lists
   `/remote/home/user/projects/foo` on the remote host.
-- `ropes -H mycluster get /remote/home/user/projects/foo/bar.txt` saves
+- `refops -H mycluster get /remote/home/user/projects/foo/bar.txt` saves
   the file locally as `/home/user/projects/foo/bar.txt`.
 
 ## Contributing
@@ -189,8 +189,8 @@ Pull requests are welcome. New contributions should include proper tests.
 ### Setup
 
 ```bash
-git clone https://github.com/bernik86/ropes.git
-cd ropes
+git clone https://github.com/bernik86/refops.git
+cd refops
 uv venv
 uv pip install -e '.[dev]'
 ```

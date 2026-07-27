@@ -23,7 +23,7 @@
 
 """Remote file operations over SSH via Fabric.
 
-This module implements the remote-side actions for ROPES CLI commands.
+This module implements the remote-side actions for refops CLI commands.
 Each public function wraps one or more Fabric / invoke calls to perform
 a file operation (list, copy, compress, tail, etc.) on a remote host.
 
@@ -41,7 +41,7 @@ import fabric
 import invoke
 from rich_click import style
 
-from ropes.lib import actions_local
+from refops.lib import actions_local
 
 
 def _construct_path(path: str, host_conf: dict[str, Any]) -> str:

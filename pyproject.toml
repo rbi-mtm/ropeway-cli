@@ -1,7 +1,7 @@
 [project]
-name = "ropes"
+name = "refops"
 version = "0.1.0"
-description = "Remote file OPErations via Ssh"
+description = "REmote File Operations via Ssh"
 readme = "README.md"
 authors = [
     { name = "bernik86", email = "44434852+bernik86@users.noreply.github.com" }
@@ -31,7 +31,7 @@ dev = [
 testpaths = ["tests"]
 
 [tool.coverage.run]
-source = ["src/ropes"]
+source = ["src/refops"]
 relative_files = true
 
 [tool.coverage.report]
@@ -39,7 +39,7 @@ show_missing = true
 fail_under = 0
 
 [project.scripts]
-ropes = "ropes.main:main"
+refops = "refops.main:main"
 
 [tool.isort]
 profile = "black"

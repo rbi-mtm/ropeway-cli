@@ -7,12 +7,12 @@ from pathlib import Path
 import pytest
 from pytest_mock import MockerFixture
 
-from ropes.lib.actions_local import construct_local_path
-from ropes.lib.actions_local import create_tmp_file
-from ropes.lib.actions_local import determine_suffix
-from ropes.lib.actions_local import edit_file
-from ropes.lib.actions_local import load_host
-from ropes.lib.actions_local import remove_tmp_file
+from refops.lib.actions_local import construct_local_path
+from refops.lib.actions_local import create_tmp_file
+from refops.lib.actions_local import determine_suffix
+from refops.lib.actions_local import edit_file
+from refops.lib.actions_local import load_host
+from refops.lib.actions_local import remove_tmp_file
 
 
 class TestDetermineSuffix:
@@ -63,7 +63,7 @@ class TestLoadHost:
         """When no path is given, the default HOST_CONFIG location is used."""
         f = tmp_path / "hosts.json"
         f.write_text('{"defaulthost": {"key": "val"}}')
-        mocker.patch("ropes.lib.actions_local.HOST_CONFIG", str(f))
+        mocker.patch("refops.lib.actions_local.HOST_CONFIG", str(f))
         result = load_host("defaulthost")
         assert result == {"key": "val"}
 
@@ -117,7 +117,7 @@ class TestEditFile:
 
     def test_editor_from_parameter(self, mocker: MockerFixture) -> None:
         """Explicit editor parameter is used."""
-        mock_run = mocker.patch("ropes.lib.actions_local.subprocess.run")
+        mock_run = mocker.patch("refops.lib.actions_local.subprocess.run")
         path = pathlib.Path("/tmp/test.txt")
         edit_file(path, editor="cat")
         mock_run.assert_called_once_with(["cat", str(path.absolute())], check=True)
@@ -125,7 +125,7 @@ class TestEditFile:
     def test_editor_from_visual_env(self, mocker: MockerFixture) -> None:
         """VISUAL environment variable is preferred when editor is None."""
         mocker.patch.dict(os.environ, {"VISUAL": "nano"}, clear=True)
-        mock_run = mocker.patch("ropes.lib.actions_local.subprocess.run")
+        mock_run = mocker.patch("refops.lib.actions_local.subprocess.run")
         path = pathlib.Path("/tmp/test.txt")
         edit_file(path, editor=None)
         mock_run.assert_called_once_with(["nano", str(path.absolute())], check=True)
@@ -133,7 +133,7 @@ class TestEditFile:
     def test_editor_from_editor_fallback(self, mocker: MockerFixture) -> None:
         """EDITOR environment variable is used when VISUAL is not set."""
         mocker.patch.dict(os.environ, {"EDITOR": "emacs"}, clear=True)
-        mock_run = mocker.patch("ropes.lib.actions_local.subprocess.run")
+        mock_run = mocker.patch("refops.lib.actions_local.subprocess.run")
         path = pathlib.Path("/tmp/test.txt")
         edit_file(path, editor=None)
         mock_run.assert_called_once_with(["emacs", str(path.absolute())], check=True)
@@ -141,7 +141,7 @@ class TestEditFile:
     def test_default_editor_fallback(self, mocker: MockerFixture) -> None:
         """'vim' is used as the default when neither VISUAL nor EDITOR are set."""
         mocker.patch.dict(os.environ, {}, clear=True)
-        mock_run = mocker.patch("ropes.lib.actions_local.subprocess.run")
+        mock_run = mocker.patch("refops.lib.actions_local.subprocess.run")
         path = pathlib.Path("/tmp/test.txt")
         edit_file(path, editor=None)
         call_args = mock_run.call_args[0][0]
@@ -158,7 +158,7 @@ class TestConstructLocalPath:
             "remote_base_path": "/remote/proj",
             "local_base_path": "/home/user/proj",
         }
-        mocker.patch("ropes.lib.actions_local.os.getcwd", return_value="/home/user")
+        mocker.patch("refops.lib.actions_local.os.getcwd", return_value="/home/user")
         result = construct_local_path("/remote/proj/sub/file.txt", host_conf)
         assert result == pathlib.Path("/home/user/proj/sub/file.txt")
 
@@ -186,7 +186,7 @@ class TestConstructLocalPath:
             "remote_base_path": "/remote/proj",
             "local_base_path": "/home/user/proj",
         }
-        mocker.patch("ropes.lib.actions_local.os.getcwd", return_value="/home/user")
+        mocker.patch("refops.lib.actions_local.os.getcwd", return_value="/home/user")
         result = construct_local_path("relative/file.txt", host_conf)
         assert result == pathlib.Path(
             "/home/user/relative/file.txt"
@@ -207,7 +207,7 @@ class TestDefaultConfig:
 
     def test_host_config_is_absolute_expanded_path(self) -> None:
         """HOST_CONFIG is an absolute path with ~ fully expanded."""
-        from ropes.lib.default import HOST_CONFIG
+        from refops.lib.default import HOST_CONFIG
 
         assert os.path.isabs(HOST_CONFIG)
         assert "~" not in HOST_CONFIG

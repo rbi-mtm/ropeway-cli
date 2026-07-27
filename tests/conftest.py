@@ -1,4 +1,5 @@
 """Shared custom fixtures for test suites."""
+
 from __future__ import annotations
 
 import json

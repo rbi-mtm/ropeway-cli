@@ -35,7 +35,7 @@ def load_host(host: str, host_file: str | None = None) -> dict[str, Any]:
     """Load the configuration for a remote host.
 
     Reads the JSON hosts file and returns the entry for the given host.
-    Defaults to the path stored in defaults.HOST_CONFIG (default: ``~/.config/ropes/hosts.json``)
+    Defaults to the path stored in defaults.HOST_CONFIG (default: ``~/.config/refops/hosts.json``)
     when no file is specified.
 
     Args:
