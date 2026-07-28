@@ -119,6 +119,26 @@ class TestPutCommand:
         assert result.exit_code == 0
         mock_remote_put.assert_called_once()
 
+    def test_put_without_overwrite_prompts(self, mocker: MockerFixture, mock_conn: Any) -> None:
+        """put without --overwrite passes confirm_overwrite=True."""
+        mocker.patch(
+            "refops.lib.cli.actions_local.construct_local_path", return_value="/local/file.txt"
+        )
+        mock_put = mocker.patch("refops.lib.cli.actions_remote.remote_put")
+        result = _invoke(mocker, mock_conn, ["put", "file.txt"])
+        assert result.exit_code == 0
+        assert mock_put.call_args.kwargs["confirm_overwrite"] is True
+
+    def test_put_with_overwrite_skips_prompt(self, mocker: MockerFixture, mock_conn: Any) -> None:
+        """put --overwrite passes confirm_overwrite=False."""
+        mocker.patch(
+            "refops.lib.cli.actions_local.construct_local_path", return_value="/local/file.txt"
+        )
+        mock_put = mocker.patch("refops.lib.cli.actions_remote.remote_put")
+        result = _invoke(mocker, mock_conn, ["put", "--overwrite", "file.txt"])
+        assert result.exit_code == 0
+        assert mock_put.call_args.kwargs["confirm_overwrite"] is False
+
 
 class TestFindCommand:
     def test_find_command(self, mocker: MockerFixture, mock_conn: Any) -> None:
@@ -454,6 +474,26 @@ class TestGetCommand:
         result = _invoke(mocker, mock_conn, ["get", "file.txt"])
         assert result.exit_code == 0
         mock_fetch.assert_called_once()
+
+    def test_get_without_overwrite_prompts(self, mocker: MockerFixture, mock_conn: Any) -> None:
+        """get without --overwrite passes confirm_overwrite=True."""
+        mocker.patch(
+            "refops.lib.cli.actions_local.construct_local_path", return_value="/local/file.txt"
+        )
+        mock_fetch = mocker.patch("refops.lib.cli.actions_remote.remote_fetch")
+        result = _invoke(mocker, mock_conn, ["get", "file.txt"])
+        assert result.exit_code == 0
+        assert mock_fetch.call_args.kwargs["confirm_overwrite"] is True
+
+    def test_get_with_overwrite_skips_prompt(self, mocker: MockerFixture, mock_conn: Any) -> None:
+        """get --overwrite passes confirm_overwrite=False."""
+        mocker.patch(
+            "refops.lib.cli.actions_local.construct_local_path", return_value="/local/file.txt"
+        )
+        mock_fetch = mocker.patch("refops.lib.cli.actions_remote.remote_fetch")
+        result = _invoke(mocker, mock_conn, ["get", "--overwrite", "file.txt"])
+        assert result.exit_code == 0
+        assert mock_fetch.call_args.kwargs["confirm_overwrite"] is False
 
 
 class TestCpCommand:
