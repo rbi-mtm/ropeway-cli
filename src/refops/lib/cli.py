@@ -188,7 +188,7 @@ def mkdir(ctx, path):
 @click.option(
     "--args",
     "rsync_args",
-    default="-auvzPh --stats --exclude='*/' --include='Input/*' --include='Input/**'",
+    default="-auvzPh --stats --include='Input/**' --include='Input/' --exclude='*/'",
     help="Arguments for rsync command",
 )
 @click.option("--from", "from_remote", is_flag=True, help="Sync dir from remote to local.")
@@ -198,7 +198,9 @@ def sync_cwd(ctx, rsync_args, from_remote):
 
     By default syncs from local to remote.  Use ``--from`` to reverse
     the direction. The remote directory is created automatically if it
-    does not exist.
+    does not exist. Use ``--args`` to specify additional arguments for
+    rsync. By default, only files in the current working directory and
+    a folder called Input/ (if it exists) are synced.
     """
     actions_remote.sync_cwd(ctx.obj["conn"], ctx.obj["host_conf"], rsync_args, from_remote)
 
@@ -294,7 +296,10 @@ def compress(ctx, use, exclude, only_cwd):
 
     if files is not None:
         files = set(files)
-        actions_remote.compress(ctx.obj["conn"], ctx.obj["host_conf"], use, "-v", files)
+        try:
+            actions_remote.compress(ctx.obj["conn"], ctx.obj["host_conf"], use, "-v", files)
+        except ValueError as exc:
+            click.echo(click.style(exc, fg="red", bg="white"))
 
 
 @cli.command(short_help="Delete a file on the remote host.")
@@ -345,7 +350,8 @@ def cp(ctx, src, dest):
 
 
 @cli.command(
-    short_help="Execute an arbitrary command on the remote host. ⚠ WARNING: use with care!"
+    short_help="Execute an arbitrary command on the remote host. " +
+    click.style("⚠ WARNING: use with care and on your own responsibility!", fg="red", bg="white")
 )
 @click.option("-D", "directory", default=".", help="Directory in which to run command.")
 @click.argument("cmd", required=False)

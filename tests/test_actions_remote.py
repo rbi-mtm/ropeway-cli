@@ -605,7 +605,7 @@ class TestCompress:
     ) -> None:
         """compress forwards the command and file list to conn.run."""
         compress(mock_conn, host_conf, "bzip2", "-v", ["file1.dat", "file2.dat"])
-        mock_conn.run.assert_called_once_with("bzip2 -v file1.dat file2.dat")
+        mock_conn.run.assert_called_once_with("bzip2 -v file1.dat file2.dat", warn=True, pty=False)
 
     def test_compress_remote_failure(
         self,
@@ -624,7 +624,7 @@ class TestCompress:
     ) -> None:
         """Empty cmp_args produces a command with extra whitespace but runs."""
         compress(mock_conn, host_conf, "bzip2", "", ["file.dat"])
-        mock_conn.run.assert_called_once_with("bzip2  file.dat")
+        mock_conn.run.assert_called_once_with("bzip2  file.dat", warn=True, pty=False)
 
     def test_compress_empty_files(
         self,
@@ -633,7 +633,7 @@ class TestCompress:
     ) -> None:
         """Empty files list produces a trailing-space command but runs."""
         compress(mock_conn, host_conf, "bzip2", "-v", [])
-        mock_conn.run.assert_called_once_with("bzip2 -v ")
+        mock_conn.run.assert_called_once_with("bzip2 -v ", warn=True, pty=False)
 
 
 class TestDeleteFile:

@@ -1,4 +1,3 @@
-#!/home/berni/.local/share/python-envs/rbi/bin/python
 #
 #  actions_remote.py
 #
@@ -282,9 +281,9 @@ def _rsync(hostname: str, src: str, dest: str, args: str, src_is_remote: bool = 
         src = f"{hostname}:{src}"
     else:
         dest = f"{hostname}:{dest}"
-    print(args)
+
     subprocess.run(
-        ["rsync"] + args.split() + ["--", src, dest], check=True
+        ["rsync"] + shlex.split(args) + ["--", src, dest], check=True
     )  # "--" prevents src/dest from being interpreted as rsync flags
 
 
@@ -427,7 +426,7 @@ def compress(
     remote_path = _construct_path(".", host_conf)
     with conn.cd(remote_path):
         cmd = f"{cmp_cmd} {cmp_args} {" ".join(files)}"
-        conn.run(cmd)
+        _run_cmd(conn, cmd)
 
 
 def delete_file(conn: fabric.Connection, host_conf: dict[str, Any], path: str):
@@ -450,7 +449,7 @@ def delete_file(conn: fabric.Connection, host_conf: dict[str, Any], path: str):
     remote_path = _construct_path(path, host_conf)
     file_type = _get_file_type(conn, remote_path)
     if file_type not in ["regular file", "symbolic link", "regular empty file"]:
-        raise ValueError("Path is not a file or link! Cannot delete it!")
+        raise ValueError("ERROR: Path is not a file or link! Cannot delete it!")
 
     print(f"Delete remote file: '{remote_path}'? [y/n]")
     resp = input()

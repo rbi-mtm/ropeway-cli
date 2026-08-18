@@ -101,8 +101,8 @@ The `-H` / `--host` flag is **required** and must match a key in
 |---|---|---|
 | `ls [PATH]` | List remote directory contents. `--args` to pass options to `ls` |
 | `view PATH` | Fetch, edit locally, optionally write back. `--editor`, `--write`, `--new` |
-| `get PATH` | Download a remote file |
-| `put PATH` | Upload a local file |
+| `get PATH` | Download a remote file. `--overwrite` to skip confirmation |
+| `put PATH` | Upload a local file. `--overwrite` to skip confirmation |
 | `mkdir [PATH]` | Create a directory on the remote host |
 | `sync_cwd` | Sync current directory via `rsync`. `--args` for rsync flags, `--from` for remote→local |
 | `find [EXPR]` | Search files via `fd` or `find`. `--use`, `--args`, `--full-path`, `--show-type` |
@@ -128,9 +128,11 @@ refops -H mycluster view /remote/path/new.txt --new
 
 # Download a file
 refops -H mycluster get /remote/path/file.txt
+refops -H mycluster get --overwrite /remote/path/file.txt
 
 # Upload a file
 refops -H mycluster put /local/path/file.txt
+refops -H mycluster put --overwrite /local/path/file.txt
 
 # Sync current directory to remote
 refops -H mycluster sync_cwd

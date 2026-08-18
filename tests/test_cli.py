@@ -89,11 +89,14 @@ class TestLsCommand:
         """ls catches ValueError and prints styled error."""
         mocker.patch(
             "refops.lib.cli.actions_remote.ls",
-            side_effect=ValueError("Invalid path"),
+            side_effect=ValueError(
+                "WARNING: command 'ls -lAh /bad/path' terminated with exit code 2!"
+                " Please check output of command carefully!"
+            ),
         )
         result = _invoke(mocker, mock_conn, ["ls", "/bad/path"])
         assert result.exit_code == 0
-        assert "Invalid path" in result.output
+        assert "terminated with exit code 2" in result.output
 
 
 class TestPutCommand:
@@ -243,11 +246,14 @@ class TestMkdirCommand:
         """mkdir catches ValueError and prints styled error."""
         mocker.patch(
             "refops.lib.cli.actions_remote.mkdir",
-            side_effect=ValueError("Permission denied"),
+            side_effect=ValueError(
+                "WARNING: command 'mkdir -p /restricted/path' terminated with exit code 1!"
+                " Please check output of command carefully!"
+            ),
         )
         result = _invoke(mocker, mock_conn, ["mkdir", "/restricted/path"])
         assert result.exit_code == 0
-        assert "Permission denied" in result.output
+        assert "terminated with exit code 1" in result.output
 
 
 class TestRealpathCommand:
@@ -298,11 +304,11 @@ class TestDeleteCommand:
         """delete catches ValueError and prints styled error."""
         mocker.patch(
             "refops.lib.cli.actions_remote.delete_file",
-            side_effect=ValueError("File is a directory"),
+            side_effect=ValueError("ERROR: Path is not a file or link! Cannot delete it!"),
         )
         result = _invoke(mocker, mock_conn, ["delete", "/remote/dir"])
         assert result.exit_code == 0
-        assert "File is a directory" in result.output
+        assert "Path is not a file or link! Cannot delete it!" in result.output
 
 
 class TestRunCommand:
@@ -333,11 +339,13 @@ class TestRunCommand:
         mock_conn.run.return_value.stdout = "directory\n"
         mocker.patch(
             "refops.lib.cli.actions_remote.run",
-            side_effect=ValueError("Directory /bad does not exist"),
+            side_effect=ValueError(
+                "ERROR: Directory /bad does not exist on remote host! Cannot run: echo hi!"
+            ),
         )
         result = _invoke(mocker, mock_conn, ["run", "echo hi"])
         assert result.exit_code == 0
-        assert "Directory /bad does not exist" in result.output
+        assert "Directory /bad does not exist on remote host" in result.output
 
     def test_run_with_directory(self, mocker: MockerFixture, mock_conn: Any) -> None:
         """run -D specifies the remote working directory."""
@@ -508,11 +516,14 @@ class TestCpCommand:
         """cp catches ValueError and prints styled error."""
         mocker.patch(
             "refops.lib.cli.actions_remote.copy",
-            side_effect=ValueError("Source not found"),
+            side_effect=ValueError(
+                "WARNING: command 'cp /remote/missing.txt /remote/dst.txt'"
+                " terminated with exit code 1! Please check output of command carefully!"
+            ),
         )
         result = _invoke(mocker, mock_conn, ["cp", "missing.txt", "dst.txt"])
         assert result.exit_code == 0
-        assert "Source not found" in result.output
+        assert "terminated with exit code 1" in result.output
 
 
 class TestTailCommand:
@@ -535,11 +546,14 @@ class TestTailCommand:
         """tail catches ValueError and prints styled error."""
         mocker.patch(
             "refops.lib.cli.actions_remote.tail",
-            side_effect=ValueError("File not found"),
+            side_effect=ValueError(
+                "WARNING: command 'tail /remote/missing.txt'"
+                " terminated with exit code 1! Please check output of command carefully!"
+            ),
         )
         result = _invoke(mocker, mock_conn, ["tail", "missing.txt"])
         assert result.exit_code == 0
-        assert "File not found" in result.output
+        assert "terminated with exit code 1" in result.output
 
 
 class TestDiffCommand:
@@ -689,3 +703,20 @@ class TestCompressCommand:
         assert "-wholename " in find_args
         assert "'*/Input/*'" in find_args
         assert "-name '*jpg'" in find_args
+
+    def test_compress_value_error(self, mocker: MockerFixture, mock_conn: Any) -> None:
+        """compress catches ValueError and prints styled error."""
+        mocker.patch(
+            "refops.lib.cli.actions_remote.find",
+            return_value=["file1.dat"],
+        )
+        mocker.patch(
+            "refops.lib.cli.actions_remote.compress",
+            side_effect=ValueError(
+                "WARNING: command 'bzip2 -v file1.dat'"
+                " terminated with exit code 1! Please check output of command carefully!"
+            ),
+        )
+        result = _invoke(mocker, mock_conn, ["compress"])
+        assert result.exit_code == 0
+        assert "terminated with exit code 1" in result.output
