@@ -1,22 +1,10 @@
-```
-              ____                
-   ________  / __/___  ____  _____
-  / ___/ _ \/ /_/ __ \/ __ \/ ___/
- / /  /  __/ __/ /_/ / /_/ (__  ) 
-/_/   \___/_/  \____/ .___/____/  
-                   /_/             
+# ropeway-cli
 
-         REmote File Operations via Ssh
-
-```
-
-# refops
-
-**refops** is a command-line tool for performing remote file operations over SSH.
+**ropeway-cli** is a command-line tool for performing remote file operations over SSH.
 It uses [Fabric](https://www.fabfile.org/) under the hood and provides a
 convenient Click-based interface for common remote file tasks.
 
-> **⚠ Warning:** refops executes commands on remote machines via SSH.
+> **⚠ Warning:** ropeway-cli executes commands on remote machines via SSH.
 > Use it at your own risk. It has only been tested on Linux (local) communicating with Linux hosts.
 
 ## Features
@@ -43,8 +31,8 @@ from source.
 ### Using `uv` (recommended)
 
 ```bash
-git clone https://github.com/bernik86/refops.git
-cd refops
+git clone https://github.com/bernik86/ropeway-cli.git
+cd ropeway-cli
 uv venv
 source .venv/bin/activate
 uv pip install .
@@ -53,19 +41,19 @@ uv pip install .
 ### Using `pip`
 
 ```bash
-git clone https://github.com/bernik86/refops.git
-cd refops
+git clone https://github.com/bernik86/ropeway-cli.git
+cd ropeway-cli
 python3 -m venv .venv
 source .venv/bin/activate
 pip install .
 ```
 
-After either method, the `refops` command is available inside the virtual
+After either method, the `ropeway-cli` command is available inside the virtual
 environment.
 
 ## Configuration
 
-Create `~/.config/refops/hosts.json` with one entry per remote host.
+Create `~/.config/ropeway-cli/hosts.json` with one entry per remote host.
 The host name (e.g. `"mycluster"`) must match a host defined in your
 `~/.ssh/config` file.
 
@@ -89,7 +77,7 @@ The host name (e.g. `"mycluster"`) must match a host defined in your
 ## Usage
 
 ```
-refops -H <host> <command> [options] [args]
+ropeway-cli -H <host> <command> [options] [args]
 ```
 
 The `-H` / `--host` flag is **required** and must match a key in
@@ -98,7 +86,7 @@ The `-H` / `--host` flag is **required** and must match a key in
 ### Commands
 
 | Command | Description |
-|---|---|---|
+|---|---|
 | `ls [PATH]` | List remote directory contents. `--args` to pass options to `ls` |
 | `view PATH` | Fetch, edit locally, optionally write back. `--editor`, `--write`, `--new` |
 | `get PATH` | Download a remote file. `--overwrite` to skip confirmation |
@@ -118,72 +106,72 @@ The `-H` / `--host` flag is **required** and must match a key in
 
 ```bash
 # List remote directory
-refops -H mycluster ls /remote/path
+ropeway-cli -H mycluster ls /remote/path
 
 # Edit a remote file locally and write changes back
-refops -H mycluster view /remote/path/file.txt --write
+ropeway-cli -H mycluster view /remote/path/file.txt --write
 
 # Create a new file on the remote host
-refops -H mycluster view /remote/path/new.txt --new
+ropeway-cli -H mycluster view /remote/path/new.txt --new
 
 # Download a file
-refops -H mycluster get /remote/path/file.txt
-refops -H mycluster get --overwrite /remote/path/file.txt
+ropeway-cli -H mycluster get /remote/path/file.txt
+ropeway-cli -H mycluster get --overwrite /remote/path/file.txt
 
 # Upload a file
-refops -H mycluster put /local/path/file.txt
-refops -H mycluster put --overwrite /local/path/file.txt
+ropeway-cli -H mycluster put /local/path/file.txt
+ropeway-cli -H mycluster put --overwrite /local/path/file.txt
 
 # Sync current directory to remote
-refops -H mycluster sync_cwd
+ropeway-cli -H mycluster sync_cwd
 
 # Sync from remote to local
-refops -H mycluster sync_cwd --from
+ropeway-cli -H mycluster sync_cwd --from
 
 # Find Python files (uses fd by default; install fd on the remote host)
 # See https://github.com/sharkdp/fd
-refops -H mycluster find -e py
-refops -H mycluster find -e py --full-path --show-type
+ropeway-cli -H mycluster find -e py
+ropeway-cli -H mycluster find -e py --full-path --show-type
 
 # Use find backend explicitly
-refops -H mycluster find --use find --args "-maxdepth 3 -name '*.py'"
+ropeway-cli -H mycluster find --use find --args "-maxdepth 3 -name '*.py'"
 
 # Compress files with gzip, excluding images
-refops -H mycluster compress --use gzip --exclude "*png *jpg"
+ropeway-cli -H mycluster compress --use gzip --exclude "*png *jpg"
 
 # Tail a remote log
-refops -H mycluster tail /remote/path/log.txt
-refops -H mycluster tail -f /remote/path/log.txt
+ropeway-cli -H mycluster tail /remote/path/log.txt
+ropeway-cli -H mycluster tail -f /remote/path/log.txt
 
 # Copy a file on the remote host
-refops -H mycluster cp /remote/path/file.txt /remote/path/file.bak
+ropeway-cli -H mycluster cp /remote/path/file.txt /remote/path/file.bak
 
 # Run a command or alias
-refops -H mycluster run "ls -la /tmp"
-refops -H mycluster run @mycommand
-refops -H mycluster run @build
+ropeway-cli -H mycluster run "ls -la /tmp"
+ropeway-cli -H mycluster run @mycommand
+ropeway-cli -H mycluster run @build
 
 # Compare two remote files (default: remote diff)
-refops -H mycluster diff /remote/path/a.txt /remote/path/b.txt
+ropeway-cli -H mycluster diff /remote/path/a.txt /remote/path/b.txt
 
 # Compare using a custom diff tool
-refops -H mycluster diff /remote/path/a.txt /remote/path/b.txt --use vimdiff
+ropeway-cli -H mycluster diff /remote/path/a.txt /remote/path/b.txt --use vimdiff
 
 # Download and compare locally
-refops -H mycluster diff /remote/path/a.txt /remote/path/b.txt --local
+ropeway-cli -H mycluster diff /remote/path/a.txt /remote/path/b.txt --local
 ```
 
 ## Path Mapping
 
-refops automatically translates paths between local and remote machines.
+ropeway-cli automatically translates paths between local and remote machines.
 When a **relative** path is given, `local_base_path` in the current working
 directory is replaced by `remote_base_path` (or vice versa).  Absolute
 paths are used as-is.
 
 For example, with the config above:
-- `refops -H mycluster ls .` from `/home/user/projects/foo` lists
+- `ropeway-cli -H mycluster ls .` from `/home/user/projects/foo` lists
   `/remote/home/user/projects/foo` on the remote host.
-- `refops -H mycluster get /remote/home/user/projects/foo/bar.txt` saves
+- `ropeway-cli -H mycluster get /remote/home/user/projects/foo/bar.txt` saves
   the file locally as `/home/user/projects/foo/bar.txt`.
 
 ## Contributing
@@ -193,8 +181,8 @@ Pull requests are welcome. New contributions should include proper tests.
 ### Setup
 
 ```bash
-git clone https://github.com/bernik86/refops.git
-cd refops
+git clone https://github.com/bernik86/ropeway-cli.git
+cd ropeway-cli
 uv venv
 uv pip install -e '.[dev]'
 ```

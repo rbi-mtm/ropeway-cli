@@ -1,28 +1,26 @@
 #
-#  actions_remote.py
+# Copyright (c) 2026 bernik86.
 #
-#  Copyright 2026 Berni <berni@sciencemachine>
+# This file is part of ropeway-cli
+# (see https://github.com/bernik86/ropeway-cli).
 #
-#  This program is free software; you can redistribute it and/or modify
-#  it under the terms of the GNU General Public License as published by
-#  the Free Software Foundation; either version 2 of the License, or
-#  (at your option) any later version.
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
 #
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
 #
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software
-#  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-#  MA 02110-1301, USA.
-#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
 """Remote file operations over SSH via Fabric.
 
-This module implements the remote-side actions for refops CLI commands.
+This module implements the remote-side actions for ropeway-cli CLI commands.
 Each public function wraps one or more Fabric / invoke calls to perform
 a file operation (list, copy, compress, tail, etc.) on a remote host.
 
@@ -40,7 +38,7 @@ import fabric
 import invoke
 from rich_click import style
 
-from refops.lib import actions_local
+from . import actions_local
 
 
 def _construct_path(path: str, host_conf: dict[str, Any]) -> str:

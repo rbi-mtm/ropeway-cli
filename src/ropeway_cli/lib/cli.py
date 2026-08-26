@@ -1,25 +1,24 @@
 #
-#  cli.py
+# Copyright (c) 2026 bernik86.
 #
-#  Copyright 2026 Berni <berni@sciencemachine>
+# This file is part of ropeway-cli
+# (see https://github.com/bernik86/ropeway-cli).
 #
-#  This program is free software; you can redistribute it and/or modify
-#  it under the terms of the GNU General Public License as published by
-#  the Free Software Foundation; either version 2 of the License, or
-#  (at your option) any later version.
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
 #
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
 #
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software
-#  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-#  MA 02110-1301, USA.
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
 
-"""CLI definitions for refops using rich-click."""
+"""CLI definitions for ropeway-cli using rich-click."""
 
 import pathlib
 
@@ -42,7 +41,7 @@ from .default import THEME
 @click.rich_config(help_config={"theme": THEME, "max_width": HELP_MAX_WIDTH})
 @click.option("-H", "--host", required=True)
 def cli(ctx, host: str):
-    """refops: REmote File Operations via Ssh
+    """ropeway-cli: Remote file operations over SSH
 
     This is a collection of commands used for remote file operations.
     It leverages the fabric module to perform file actions on a remote
@@ -50,7 +49,7 @@ def cli(ctx, host: str):
 
     When invoked without a subcommand the help screen is displayed.
     On successful invocation the host configuration is loaded from
-    ``~/.config/refops/hosts.json`` and a Fabric SSH connection is
+    ``~/.config/ropeway-cli/hosts.json`` and a Fabric SSH connection is
     established, both stored in the Click context for use by
     subcommands.
     """
@@ -59,7 +58,7 @@ def cli(ctx, host: str):
         click.echo(
             click.style(
                 f"ERROR: {HOST_CONFIG} does not exist!"
-                " Create proper file (see README.md) and run refops again!",
+                " Create proper file (see README.md) and run ropeway-cli again!",
                 fg="red",
                 bg="white",
             )
@@ -350,8 +349,8 @@ def cp(ctx, src, dest):
 
 
 @cli.command(
-    short_help="Execute an arbitrary command on the remote host. " +
-    click.style("⚠ WARNING: use with care and on your own responsibility!", fg="red", bg="white")
+    short_help="Execute an arbitrary command on the remote host. "
+    + click.style("⚠ WARNING: use with care and on your own responsibility!", fg="red", bg="white")
 )
 @click.option("-D", "directory", default=".", help="Directory in which to run command.")
 @click.argument("cmd", required=False)

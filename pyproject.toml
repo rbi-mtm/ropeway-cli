@@ -1,7 +1,7 @@
 [project]
-name = "refops"
+name = "ropeway-cli"
 version = "0.1.0"
-description = "REmote File Operations via Ssh"
+description = "Remote file operations over SSH via a ropeway metaphor — a CLI tool for transferring, syncing, and managing remote files"
 readme = "README.md"
 authors = [
     { name = "bernik86", email = "44434852+bernik86@users.noreply.github.com" }
@@ -31,7 +31,7 @@ dev = [
 testpaths = ["tests"]
 
 [tool.coverage.run]
-source = ["src/refops"]
+source = ["src/ropeway_cli"]
 relative_files = true
 
 [tool.coverage.report]
@@ -39,7 +39,7 @@ show_missing = true
 fail_under = 0
 
 [project.scripts]
-refops = "refops.main:main"
+ropeway-cli = "ropeway_cli.main:main"
 
 [tool.isort]
 profile = "black"
@@ -63,5 +63,3 @@ ignore_missing_imports = true
 [build-system]
 requires = ["uv_build>=0.10.11,<0.11.0"]
 build-backend = "uv_build"
-
-

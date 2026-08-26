@@ -1,3 +1,23 @@
+#
+# Copyright (c) 2026 bernik86.
+#
+# This file is part of ropeway-cli
+# (see https://github.com/bernik86/ropeway-cli).
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+
 """Collection of tests for actions_local.py"""
 
 import os
@@ -7,12 +27,12 @@ from pathlib import Path
 import pytest
 from pytest_mock import MockerFixture
 
-from refops.lib.actions_local import construct_local_path
-from refops.lib.actions_local import create_tmp_file
-from refops.lib.actions_local import determine_suffix
-from refops.lib.actions_local import edit_file
-from refops.lib.actions_local import load_host
-from refops.lib.actions_local import remove_tmp_file
+from ropeway_cli.lib.actions_local import construct_local_path
+from ropeway_cli.lib.actions_local import create_tmp_file
+from ropeway_cli.lib.actions_local import determine_suffix
+from ropeway_cli.lib.actions_local import edit_file
+from ropeway_cli.lib.actions_local import load_host
+from ropeway_cli.lib.actions_local import remove_tmp_file
 
 
 class TestDetermineSuffix:
@@ -63,7 +83,7 @@ class TestLoadHost:
         """When no path is given, the default HOST_CONFIG location is used."""
         f = tmp_path / "hosts.json"
         f.write_text('{"defaulthost": {"key": "val"}}')
-        mocker.patch("refops.lib.actions_local.HOST_CONFIG", str(f))
+        mocker.patch("ropeway_cli.lib.actions_local.HOST_CONFIG", str(f))
         result = load_host("defaulthost")
         assert result == {"key": "val"}
 
@@ -117,7 +137,7 @@ class TestEditFile:
 
     def test_editor_from_parameter(self, mocker: MockerFixture) -> None:
         """Explicit editor parameter is used."""
-        mock_run = mocker.patch("refops.lib.actions_local.subprocess.run")
+        mock_run = mocker.patch("ropeway_cli.lib.actions_local.subprocess.run")
         path = pathlib.Path("/tmp/test.txt")
         edit_file(path, editor="cat")
         mock_run.assert_called_once_with(["cat", str(path.absolute())], check=True)
@@ -125,7 +145,7 @@ class TestEditFile:
     def test_editor_from_visual_env(self, mocker: MockerFixture) -> None:
         """VISUAL environment variable is preferred when editor is None."""
         mocker.patch.dict(os.environ, {"VISUAL": "nano"}, clear=True)
-        mock_run = mocker.patch("refops.lib.actions_local.subprocess.run")
+        mock_run = mocker.patch("ropeway_cli.lib.actions_local.subprocess.run")
         path = pathlib.Path("/tmp/test.txt")
         edit_file(path, editor=None)
         mock_run.assert_called_once_with(["nano", str(path.absolute())], check=True)
@@ -133,7 +153,7 @@ class TestEditFile:
     def test_editor_from_editor_fallback(self, mocker: MockerFixture) -> None:
         """EDITOR environment variable is used when VISUAL is not set."""
         mocker.patch.dict(os.environ, {"EDITOR": "emacs"}, clear=True)
-        mock_run = mocker.patch("refops.lib.actions_local.subprocess.run")
+        mock_run = mocker.patch("ropeway_cli.lib.actions_local.subprocess.run")
         path = pathlib.Path("/tmp/test.txt")
         edit_file(path, editor=None)
         mock_run.assert_called_once_with(["emacs", str(path.absolute())], check=True)
@@ -141,7 +161,7 @@ class TestEditFile:
     def test_default_editor_fallback(self, mocker: MockerFixture) -> None:
         """'vim' is used as the default when neither VISUAL nor EDITOR are set."""
         mocker.patch.dict(os.environ, {}, clear=True)
-        mock_run = mocker.patch("refops.lib.actions_local.subprocess.run")
+        mock_run = mocker.patch("ropeway_cli.lib.actions_local.subprocess.run")
         path = pathlib.Path("/tmp/test.txt")
         edit_file(path, editor=None)
         call_args = mock_run.call_args[0][0]
@@ -158,7 +178,7 @@ class TestConstructLocalPath:
             "remote_base_path": "/remote/proj",
             "local_base_path": "/home/user/proj",
         }
-        mocker.patch("refops.lib.actions_local.os.getcwd", return_value="/home/user")
+        mocker.patch("ropeway_cli.lib.actions_local.os.getcwd", return_value="/home/user")
         result = construct_local_path("/remote/proj/sub/file.txt", host_conf)
         assert result == pathlib.Path("/home/user/proj/sub/file.txt")
 
@@ -186,7 +206,7 @@ class TestConstructLocalPath:
             "remote_base_path": "/remote/proj",
             "local_base_path": "/home/user/proj",
         }
-        mocker.patch("refops.lib.actions_local.os.getcwd", return_value="/home/user")
+        mocker.patch("ropeway_cli.lib.actions_local.os.getcwd", return_value="/home/user")
         result = construct_local_path("relative/file.txt", host_conf)
         assert result == pathlib.Path(
             "/home/user/relative/file.txt"
@@ -207,7 +227,7 @@ class TestDefaultConfig:
 
     def test_host_config_is_absolute_expanded_path(self) -> None:
         """HOST_CONFIG is an absolute path with ~ fully expanded."""
-        from refops.lib.default import HOST_CONFIG
+        from ropeway_cli.lib.default import HOST_CONFIG
 
         assert os.path.isabs(HOST_CONFIG)
         assert "~" not in HOST_CONFIG

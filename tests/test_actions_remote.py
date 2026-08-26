@@ -1,3 +1,23 @@
+#
+# Copyright (c) 2026 bernik86.
+#
+# This file is part of ropeway-cli
+# (see https://github.com/bernik86/ropeway-cli).
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+#
+
 """Collection of tests for actions_remote.py"""
 
 from __future__ import annotations
@@ -9,25 +29,25 @@ import invoke
 import pytest
 from pytest_mock import MockerFixture
 
-from refops.lib.actions_remote import _construct_path
-from refops.lib.actions_remote import _diff_local_cleanup
-from refops.lib.actions_remote import _file_exists
-from refops.lib.actions_remote import _get_file_type
-from refops.lib.actions_remote import _rsync
-from refops.lib.actions_remote import _run_cmd
-from refops.lib.actions_remote import compress
-from refops.lib.actions_remote import copy as remote_copy
-from refops.lib.actions_remote import delete_file
-from refops.lib.actions_remote import diff
-from refops.lib.actions_remote import find
-from refops.lib.actions_remote import ls
-from refops.lib.actions_remote import mkdir
-from refops.lib.actions_remote import realpath
-from refops.lib.actions_remote import remote_fetch
-from refops.lib.actions_remote import remote_put
-from refops.lib.actions_remote import run as remote_run
-from refops.lib.actions_remote import sync_cwd
-from refops.lib.actions_remote import tail
+from ropeway_cli.lib.actions_remote import _construct_path
+from ropeway_cli.lib.actions_remote import _diff_local_cleanup
+from ropeway_cli.lib.actions_remote import _file_exists
+from ropeway_cli.lib.actions_remote import _get_file_type
+from ropeway_cli.lib.actions_remote import _rsync
+from ropeway_cli.lib.actions_remote import _run_cmd
+from ropeway_cli.lib.actions_remote import compress
+from ropeway_cli.lib.actions_remote import copy as remote_copy
+from ropeway_cli.lib.actions_remote import delete_file
+from ropeway_cli.lib.actions_remote import diff
+from ropeway_cli.lib.actions_remote import find
+from ropeway_cli.lib.actions_remote import ls
+from ropeway_cli.lib.actions_remote import mkdir
+from ropeway_cli.lib.actions_remote import realpath
+from ropeway_cli.lib.actions_remote import remote_fetch
+from ropeway_cli.lib.actions_remote import remote_put
+from ropeway_cli.lib.actions_remote import run as remote_run
+from ropeway_cli.lib.actions_remote import sync_cwd
+from ropeway_cli.lib.actions_remote import tail
 
 
 class TestConstructPath:
@@ -118,7 +138,7 @@ class TestRemoteFetch:
         tmp_path: Path,
     ) -> None:
         """Successful download: path translation, conn.get call, and post-download check pass."""
-        mocker.patch("refops.lib.actions_remote.os.path.isfile", return_value=True)
+        mocker.patch("ropeway_cli.lib.actions_remote.os.path.isfile", return_value=True)
         dest = tmp_path / "downloaded.txt"
         remote_fetch(mock_conn, host_conf, "/home/user/project/file.txt", dest)
         mock_conn.get.assert_called_once()
@@ -143,7 +163,7 @@ class TestRemoteFetch:
         tmp_path: Path,
     ) -> None:
         """conn.get succeeds but temp file is missing raises FileNotFoundError."""
-        mocker.patch("refops.lib.actions_remote.os.path.isfile", return_value=False)
+        mocker.patch("ropeway_cli.lib.actions_remote.os.path.isfile", return_value=False)
         dest = tmp_path / "not_created.txt"
         with pytest.raises(FileNotFoundError, match="Temporary file not found"):
             remote_fetch(mock_conn, host_conf, "/home/user/project/file.txt", dest)
@@ -156,7 +176,7 @@ class TestRemoteFetch:
         tmp_path: Path,
     ) -> None:
         """User declines overwrite: conn.get is not called."""
-        mocker.patch("refops.lib.actions_remote.os.path.isfile", return_value=True)
+        mocker.patch("ropeway_cli.lib.actions_remote.os.path.isfile", return_value=True)
         mocker.patch("builtins.input", return_value="n")
         mocker.patch("builtins.print")
         dest = tmp_path / "existing.txt"
@@ -172,7 +192,7 @@ class TestRemoteFetch:
         tmp_path: Path,
     ) -> None:
         """User accepts overwrite: conn.get proceeds."""
-        mocker.patch("refops.lib.actions_remote.os.path.isfile", return_value=True)
+        mocker.patch("ropeway_cli.lib.actions_remote.os.path.isfile", return_value=True)
         mocker.patch("builtins.input", return_value="y")
         mocker.patch("builtins.print")
         dest = tmp_path / "existing.txt"
@@ -188,7 +208,7 @@ class TestRemoteFetch:
         tmp_path: Path,
     ) -> None:
         """confirm_overwrite=False skips the prompt even if file exists."""
-        mocker.patch("refops.lib.actions_remote.os.path.isfile", return_value=True)
+        mocker.patch("ropeway_cli.lib.actions_remote.os.path.isfile", return_value=True)
         mock_input = mocker.patch("builtins.input")
         mocker.patch("builtins.print")
         dest = tmp_path / "existing.txt"
@@ -238,7 +258,7 @@ class TestRemotePut:
         tmp_path: Path,
     ) -> None:
         """User declines overwrite: conn.put is not called."""
-        mocker.patch("refops.lib.actions_remote._file_exists", return_value=True)
+        mocker.patch("ropeway_cli.lib.actions_remote._file_exists", return_value=True)
         mocker.patch("builtins.input", return_value="n")
         mocker.patch("builtins.print")
         src = tmp_path / "local.txt"
@@ -253,7 +273,7 @@ class TestRemotePut:
         tmp_path: Path,
     ) -> None:
         """User accepts overwrite: conn.put proceeds."""
-        mocker.patch("refops.lib.actions_remote._file_exists", return_value=True)
+        mocker.patch("ropeway_cli.lib.actions_remote._file_exists", return_value=True)
         mocker.patch("builtins.input", return_value="y")
         mocker.patch("builtins.print")
         src = tmp_path / "local.txt"
@@ -268,7 +288,7 @@ class TestRemotePut:
         tmp_path: Path,
     ) -> None:
         """confirm_overwrite=True but remote file absent skips the prompt."""
-        mocker.patch("refops.lib.actions_remote._file_exists", return_value=False)
+        mocker.patch("ropeway_cli.lib.actions_remote._file_exists", return_value=False)
         mock_input = mocker.patch("builtins.input")
         src = tmp_path / "local.txt"
         remote_put(mock_conn, host_conf, "/home/user/project/remote.txt", src)
@@ -320,10 +340,10 @@ class TestMkdir:
         host_conf: dict[str, str],
     ) -> None:
         """The '.' special case uses basename(CWD) as the directory name and chdirs to parent."""
-        mocker.patch("refops.lib.actions_remote.os.getcwd", return_value="/home/user/project/sub")
-        mocker.patch("refops.lib.actions_remote.os.chdir")
+        mocker.patch("ropeway_cli.lib.actions_remote.os.getcwd", return_value="/home/user/project/sub")
+        mocker.patch("ropeway_cli.lib.actions_remote.os.chdir")
         mocker.patch(
-            "refops.lib.actions_remote._construct_path",
+            "ropeway_cli.lib.actions_remote._construct_path",
             return_value="/remote/home/user/project/sub",
         )
         mkdir(mock_conn, host_conf, ".")
@@ -352,7 +372,7 @@ class TestRsync:
 
     def test_rsync_push(self, mocker: MockerFixture) -> None:
         """Push mode: hostname: is prepended to the destination path."""
-        mock_subprocess = mocker.patch("refops.lib.actions_remote.subprocess.run")
+        mock_subprocess = mocker.patch("ropeway_cli.lib.actions_remote.subprocess.run")
         _rsync("myhost", "/local/path", "/remote/path", "-auvz")
         cmd = mock_subprocess.call_args[0][0]
         assert cmd[:2] == ["rsync", "-auvz"]
@@ -361,7 +381,7 @@ class TestRsync:
 
     def test_rsync_pull(self, mocker: MockerFixture) -> None:
         """Pull mode: hostname: is prepended to the source path."""
-        mock_subprocess = mocker.patch("refops.lib.actions_remote.subprocess.run")
+        mock_subprocess = mocker.patch("ropeway_cli.lib.actions_remote.subprocess.run")
         _rsync("myhost", "/remote/path", "/local/path", "-auvz", src_is_remote=True)
         cmd = mock_subprocess.call_args[0][0]
         assert cmd[-2] == "myhost:/remote/path/"
@@ -371,7 +391,7 @@ class TestRsync:
         """subprocess.run failure (check=True) raises CalledProcessError."""
         import subprocess  # pylint: disable=import-outside-toplevel
 
-        mock_subprocess = mocker.patch("refops.lib.actions_remote.subprocess.run")
+        mock_subprocess = mocker.patch("ropeway_cli.lib.actions_remote.subprocess.run")
         mock_subprocess.side_effect = subprocess.CalledProcessError(1, ["rsync"])
         with pytest.raises(subprocess.CalledProcessError):
             _rsync("myhost", "/local/path", "/remote/path", "-auvz")
@@ -387,9 +407,9 @@ class TestSyncCwd:
         host_conf: dict[str, str],
     ) -> None:
         """Push from local_base: CWD equals local_base, uses remote_base directly."""
-        mocker.patch("refops.lib.actions_remote.os.getcwd", return_value="/home/user/project")
-        mocker.patch("refops.lib.actions_remote.mkdir")
-        mock_rsync = mocker.patch("refops.lib.actions_remote._rsync")
+        mocker.patch("ropeway_cli.lib.actions_remote.os.getcwd", return_value="/home/user/project")
+        mocker.patch("ropeway_cli.lib.actions_remote.mkdir")
+        mock_rsync = mocker.patch("ropeway_cli.lib.actions_remote._rsync")
         sync_cwd(mock_conn, host_conf, "-auvz", from_remote=False)
         mock_rsync.assert_called_once_with(
             "testhost", "/home/user/project", "/remote/home/user/project", "-auvz"
@@ -402,8 +422,8 @@ class TestSyncCwd:
         host_conf: dict[str, str],
     ) -> None:
         """Pull from remote_base: CWD equals local_base, uses remote_base with src_is_remote."""
-        mocker.patch("refops.lib.actions_remote.os.getcwd", return_value="/home/user/project")
-        mock_rsync = mocker.patch("refops.lib.actions_remote._rsync")
+        mocker.patch("ropeway_cli.lib.actions_remote.os.getcwd", return_value="/home/user/project")
+        mock_rsync = mocker.patch("ropeway_cli.lib.actions_remote._rsync")
         sync_cwd(mock_conn, host_conf, "-auvz", from_remote=True)
         mock_rsync.assert_called_once_with(
             "testhost",
@@ -420,11 +440,11 @@ class TestSyncCwd:
         host_conf: dict[str, str],
     ) -> None:
         """Push from a subdirectory: _construct_path translates '.' to the remote equivalent."""
-        mocker.patch("refops.lib.actions_remote.os.getcwd", return_value="/home/user/project/sub")
-        mock_rsync = mocker.patch("refops.lib.actions_remote._rsync")
-        mocker.patch("refops.lib.actions_remote.mkdir")
+        mocker.patch("ropeway_cli.lib.actions_remote.os.getcwd", return_value="/home/user/project/sub")
+        mock_rsync = mocker.patch("ropeway_cli.lib.actions_remote._rsync")
+        mocker.patch("ropeway_cli.lib.actions_remote.mkdir")
         mocker.patch(
-            "refops.lib.actions_remote._construct_path",
+            "ropeway_cli.lib.actions_remote._construct_path",
             return_value="/remote/home/user/project/sub",
         )
         sync_cwd(mock_conn, host_conf, "-auvz", from_remote=False)
@@ -439,10 +459,10 @@ class TestSyncCwd:
         host_conf: dict[str, str],
     ) -> None:
         """Pull from a subdirectory: uses _construct_path and skips mkdir."""
-        mocker.patch("refops.lib.actions_remote.os.getcwd", return_value="/home/user/project/sub")
-        mock_rsync = mocker.patch("refops.lib.actions_remote._rsync")
+        mocker.patch("ropeway_cli.lib.actions_remote.os.getcwd", return_value="/home/user/project/sub")
+        mock_rsync = mocker.patch("ropeway_cli.lib.actions_remote._rsync")
         mocker.patch(
-            "refops.lib.actions_remote._construct_path",
+            "ropeway_cli.lib.actions_remote._construct_path",
             return_value="/remote/home/user/project/sub",
         )
         sync_cwd(mock_conn, host_conf, "-auvz", from_remote=True)
@@ -465,7 +485,7 @@ class TestFind:
         host_conf: dict[str, str],
     ) -> None:
         """find backend returns results split by newline."""
-        mocker.patch("refops.lib.actions_remote._construct_path", return_value="/remote/root")
+        mocker.patch("ropeway_cli.lib.actions_remote._construct_path", return_value="/remote/root")
         mock_conn.run.return_value.stdout = "file1.py\nfile2.py\n"
         result = find(mock_conn, host_conf, "find", "-name '*.py'")
         assert result == ["file1.py", "file2.py", ""]
@@ -480,7 +500,7 @@ class TestFind:
         backend: str,
     ) -> None:
         """fd backend (and rust_find alias) return results split by newline."""
-        mocker.patch("refops.lib.actions_remote._construct_path", return_value="/remote/root")
+        mocker.patch("ropeway_cli.lib.actions_remote._construct_path", return_value="/remote/root")
         mock_conn.run.return_value.stdout = "a.py\nb.py\n"
         result = find(mock_conn, host_conf, backend, "-e py", expr="")
         assert result == ["a.py", "b.py", ""]
@@ -493,7 +513,7 @@ class TestFind:
         host_conf: dict[str, str],
     ) -> None:
         """Empty stdout from conn.run returns None."""
-        mocker.patch("refops.lib.actions_remote._construct_path", return_value="/remote/root")
+        mocker.patch("ropeway_cli.lib.actions_remote._construct_path", return_value="/remote/root")
         mock_conn.run.return_value.stdout = ""
         result = find(mock_conn, host_conf, "find", "")
         assert result is None
@@ -506,7 +526,7 @@ class TestFind:
         host_conf: dict[str, str],
     ) -> None:
         """Non-empty expr with 'find' backend prints a warning (expr is ignored)."""
-        mocker.patch("refops.lib.actions_remote._construct_path", return_value="/remote/root")
+        mocker.patch("ropeway_cli.lib.actions_remote._construct_path", return_value="/remote/root")
         mock_print = mocker.patch("builtins.print")
         mock_conn.run.return_value.stdout = "some/file.py\n"
         result = find(mock_conn, host_conf, "find", "-name '*.py'", expr="*.py")
@@ -531,7 +551,7 @@ class TestFind:
         host_conf: dict[str, str],
     ) -> None:
         """UnexpectedExit from conn.run is propagated."""
-        mocker.patch("refops.lib.actions_remote._construct_path", return_value="/remote/root")
+        mocker.patch("ropeway_cli.lib.actions_remote._construct_path", return_value="/remote/root")
         mock_conn.run.side_effect = invoke.exceptions.UnexpectedExit(None)
         with pytest.raises(invoke.exceptions.UnexpectedExit):
             find(mock_conn, host_conf, "find", "")
@@ -570,8 +590,8 @@ class TestRealpath:
         mocker: MockerFixture,
     ) -> None:
         """show_type with 'unknown' file type still returns the path."""
-        mocker.patch("refops.lib.actions_remote._construct_path", return_value="/remote/path")
-        mocker.patch("refops.lib.actions_remote._get_file_type", return_value="unknown")
+        mocker.patch("ropeway_cli.lib.actions_remote._construct_path", return_value="/remote/path")
+        mocker.patch("ropeway_cli.lib.actions_remote._get_file_type", return_value="unknown")
         result = realpath(mock_conn, host_conf, "/local/path", show_type=True)
         assert result == f"{'unknown':15} /remote/path"
 
@@ -887,7 +907,7 @@ class TestRun:
             "@build": ["make", "/custom/build/dir"],
         }
         mock_conn.run.return_value.stdout = "directory\n"
-        mock_style = mocker.patch("refops.lib.actions_remote.style")
+        mock_style = mocker.patch("ropeway_cli.lib.actions_remote.style")
         remote_run(mock_conn, conf, "@build", "/local")
         mock_style.assert_any_call("h", bold=True, fg="blue")
         mock_style.assert_any_call("/custom/build/dir", bold=True, fg="red")
@@ -903,7 +923,7 @@ class TestRun:
             "@build": "make",
         }
         mock_conn.run.return_value.stdout = "directory\n"
-        mock_style = mocker.patch("refops.lib.actions_remote.style")
+        mock_style = mocker.patch("ropeway_cli.lib.actions_remote.style")
         remote_run(mock_conn, conf, "@build", "/local")
         mock_style.assert_any_call("h", bold=True, fg="blue")
         mock_style.assert_any_call("/remote", bold=True, fg="green")
@@ -945,7 +965,7 @@ class TestDiffLocalCleanup:
 
     def test_cleanup_removes_each_file(self, mocker: MockerFixture) -> None:
         """Calls remove_tmp_file for each file in the list."""
-        mock_remove = mocker.patch("refops.lib.actions_remote.actions_local.remove_tmp_file")
+        mock_remove = mocker.patch("ropeway_cli.lib.actions_remote.actions_local.remove_tmp_file")
         tmp_files = [Path("/tmp/foo"), Path("/tmp/bar")]
         _diff_local_cleanup(tmp_files)
         assert mock_remove.call_args_list == [
@@ -955,7 +975,7 @@ class TestDiffLocalCleanup:
 
     def test_cleanup_empty_list(self, mocker: MockerFixture) -> None:
         """Empty list does not call remove_tmp_file."""
-        mock_remove = mocker.patch("refops.lib.actions_remote.actions_local.remove_tmp_file")
+        mock_remove = mocker.patch("ropeway_cli.lib.actions_remote.actions_local.remove_tmp_file")
         _diff_local_cleanup([])
         mock_remove.assert_not_called()
 
@@ -973,7 +993,7 @@ class TestDiff:
     ) -> None:
         """Identical remote files: diff exits 0."""
         mocker.patch(
-            "refops.lib.actions_remote._construct_path",
+            "ropeway_cli.lib.actions_remote._construct_path",
             side_effect=["/remote/a.txt", "/remote/b.txt"],
         )
         result = diff(mock_conn, host_conf, "path_a", "path_b", "diff", "", False)
@@ -990,7 +1010,7 @@ class TestDiff:
     ) -> None:
         """Different remote files: diff exits 1, propagated as return value."""
         mocker.patch(
-            "refops.lib.actions_remote._construct_path",
+            "ropeway_cli.lib.actions_remote._construct_path",
             side_effect=["/remote/a.txt", "/remote/b.txt"],
         )
         mock_conn.run.return_value.exited = 1
@@ -1006,17 +1026,17 @@ class TestDiff:
     ) -> None:
         """Non-diff command forces local mode, downloads files and runs locally."""
         mocker.patch(
-            "refops.lib.actions_remote._construct_path",
+            "ropeway_cli.lib.actions_remote._construct_path",
             side_effect=["/remote/a.txt", "/remote/b.txt"],
         )
         mocker.patch("builtins.print")
         tmp_a = tmp_path / "refops_a.txt"
         tmp_b = tmp_path / "refops_b.txt"
-        mocker.patch("refops.lib.actions_local.create_tmp_file", side_effect=[tmp_a, tmp_b])
-        mock_fetch = mocker.patch("refops.lib.actions_remote.remote_fetch")
-        mocker.patch("refops.lib.actions_local.remove_tmp_file")
+        mocker.patch("ropeway_cli.lib.actions_local.create_tmp_file", side_effect=[tmp_a, tmp_b])
+        mock_fetch = mocker.patch("ropeway_cli.lib.actions_remote.remote_fetch")
+        mocker.patch("ropeway_cli.lib.actions_local.remove_tmp_file")
         mock_subprocess = mocker.patch(
-            "refops.lib.actions_remote.subprocess.run",
+            "ropeway_cli.lib.actions_remote.subprocess.run",
             return_value=mocker.MagicMock(returncode=0),
         )
         result = diff(mock_conn, host_conf, "path_a", "path_b", "vimdiff", "", local=False)
@@ -1033,7 +1053,7 @@ class TestDiff:
     ) -> None:
         """Extra diff arguments (e.g. -u) appear in the remote command."""
         mocker.patch(
-            "refops.lib.actions_remote._construct_path",
+            "ropeway_cli.lib.actions_remote._construct_path",
             side_effect=["/remote/a.txt", "/remote/b.txt"],
         )
         diff(mock_conn, host_conf, "path_a", "path_b", "diff", "-u", False)
@@ -1049,7 +1069,7 @@ class TestDiff:
     ) -> None:
         """Both paths are translated via _construct_path before diff."""
         mock_construct = mocker.patch(
-            "refops.lib.actions_remote._construct_path",
+            "ropeway_cli.lib.actions_remote._construct_path",
             side_effect=["/remote/x.txt", "/remote/y.txt"],
         )
         diff(mock_conn, host_conf, "local_a", "local_b", "diff", "", False)
@@ -1070,11 +1090,11 @@ class TestDiff:
         """Local mode: identical files, subprocess exits 0, temps cleaned."""
         tmp_a = tmp_path / "refops_a.txt"
         tmp_b = tmp_path / "refops_b.txt"
-        mocker.patch("refops.lib.actions_local.create_tmp_file", side_effect=[tmp_a, tmp_b])
-        mock_fetch = mocker.patch("refops.lib.actions_remote.remote_fetch")
-        mock_remove = mocker.patch("refops.lib.actions_local.remove_tmp_file")
+        mocker.patch("ropeway_cli.lib.actions_local.create_tmp_file", side_effect=[tmp_a, tmp_b])
+        mock_fetch = mocker.patch("ropeway_cli.lib.actions_remote.remote_fetch")
+        mock_remove = mocker.patch("ropeway_cli.lib.actions_local.remove_tmp_file")
         mock_subprocess = mocker.patch(
-            "refops.lib.actions_remote.subprocess.run",
+            "ropeway_cli.lib.actions_remote.subprocess.run",
             return_value=mocker.MagicMock(returncode=0),
         )
         result = diff(mock_conn, host_conf, "path_a", "path_b", "diff", "", True)
@@ -1093,11 +1113,11 @@ class TestDiff:
         """Local mode: files differ, subprocess exits 1, return code propagated."""
         tmp_a = tmp_path / "refops_a.txt"
         tmp_b = tmp_path / "refops_b.txt"
-        mocker.patch("refops.lib.actions_local.create_tmp_file", side_effect=[tmp_a, tmp_b])
-        mocker.patch("refops.lib.actions_remote.remote_fetch")
-        mock_remove = mocker.patch("refops.lib.actions_local.remove_tmp_file")
+        mocker.patch("ropeway_cli.lib.actions_local.create_tmp_file", side_effect=[tmp_a, tmp_b])
+        mocker.patch("ropeway_cli.lib.actions_remote.remote_fetch")
+        mock_remove = mocker.patch("ropeway_cli.lib.actions_local.remove_tmp_file")
         mocker.patch(
-            "refops.lib.actions_remote.subprocess.run",
+            "ropeway_cli.lib.actions_remote.subprocess.run",
             return_value=mocker.MagicMock(returncode=1),
         )
         result = diff(mock_conn, host_conf, "path_a", "path_b", "diff", "", True)
@@ -1114,11 +1134,11 @@ class TestDiff:
         """Local mode: custom diff cmd and args forwarded to subprocess."""
         tmp_a = tmp_path / "refops_a.txt"
         tmp_b = tmp_path / "refops_b.txt"
-        mocker.patch("refops.lib.actions_local.create_tmp_file", side_effect=[tmp_a, tmp_b])
-        mocker.patch("refops.lib.actions_remote.remote_fetch")
-        mocker.patch("refops.lib.actions_local.remove_tmp_file")
+        mocker.patch("ropeway_cli.lib.actions_local.create_tmp_file", side_effect=[tmp_a, tmp_b])
+        mocker.patch("ropeway_cli.lib.actions_remote.remote_fetch")
+        mocker.patch("ropeway_cli.lib.actions_local.remove_tmp_file")
         mock_subprocess = mocker.patch(
-            "refops.lib.actions_remote.subprocess.run",
+            "ropeway_cli.lib.actions_remote.subprocess.run",
             return_value=mocker.MagicMock(returncode=0),
         )
         diff(
@@ -1148,12 +1168,12 @@ class TestDiff:
         """A failed fetch cleans both temps and propagates the error."""
         tmp_a = tmp_path / "refops_a.txt"
         tmp_b = tmp_path / "refops_b.txt"
-        mocker.patch("refops.lib.actions_local.create_tmp_file", side_effect=[tmp_a, tmp_b])
+        mocker.patch("ropeway_cli.lib.actions_local.create_tmp_file", side_effect=[tmp_a, tmp_b])
         mocker.patch(
-            "refops.lib.actions_remote.remote_fetch",
+            "ropeway_cli.lib.actions_remote.remote_fetch",
             side_effect=fetch_side_effect,
         )
-        mock_remove = mocker.patch("refops.lib.actions_local.remove_tmp_file")
+        mock_remove = mocker.patch("ropeway_cli.lib.actions_local.remove_tmp_file")
         with pytest.raises(FileNotFoundError):
             diff(mock_conn, host_conf, "path_a", "path_b", "diff", "", True)
         assert mock_remove.call_count == 2
@@ -1168,11 +1188,11 @@ class TestDiff:
         """Local mode: subprocess.run raises, temps cleaned, error propagated."""
         tmp_a = tmp_path / "refops_a.txt"
         tmp_b = tmp_path / "refops_b.txt"
-        mocker.patch("refops.lib.actions_local.create_tmp_file", side_effect=[tmp_a, tmp_b])
-        mocker.patch("refops.lib.actions_remote.remote_fetch")
-        mock_remove = mocker.patch("refops.lib.actions_local.remove_tmp_file")
+        mocker.patch("ropeway_cli.lib.actions_local.create_tmp_file", side_effect=[tmp_a, tmp_b])
+        mocker.patch("ropeway_cli.lib.actions_remote.remote_fetch")
+        mock_remove = mocker.patch("ropeway_cli.lib.actions_local.remove_tmp_file")
         mocker.patch(
-            "refops.lib.actions_remote.subprocess.run",
+            "ropeway_cli.lib.actions_remote.subprocess.run",
             side_effect=FileNotFoundError("diff: not found"),
         )
         with pytest.raises(FileNotFoundError):
@@ -1189,11 +1209,11 @@ class TestDiff:
         """Local mode: any exception triggers temp cleanup via finally blocks."""
         tmp_a = tmp_path / "refops_a.txt"
         tmp_b = tmp_path / "refops_b.txt"
-        mocker.patch("refops.lib.actions_local.create_tmp_file", side_effect=[tmp_a, tmp_b])
-        mocker.patch("refops.lib.actions_remote.remote_fetch")
-        mock_remove = mocker.patch("refops.lib.actions_local.remove_tmp_file")
+        mocker.patch("ropeway_cli.lib.actions_local.create_tmp_file", side_effect=[tmp_a, tmp_b])
+        mocker.patch("ropeway_cli.lib.actions_remote.remote_fetch")
+        mock_remove = mocker.patch("ropeway_cli.lib.actions_local.remove_tmp_file")
         mocker.patch(
-            "refops.lib.actions_remote.subprocess.run",
+            "ropeway_cli.lib.actions_remote.subprocess.run",
             side_effect=RuntimeError("unexpected"),
         )
         with pytest.raises(RuntimeError):
@@ -1210,7 +1230,7 @@ class TestDiff:
     ) -> None:
         """Same path for both arguments: diff runs (returns 0 for identical)."""
         mocker.patch(
-            "refops.lib.actions_remote._construct_path",
+            "ropeway_cli.lib.actions_remote._construct_path",
             return_value="/remote/same.txt",
         )
         result = diff(mock_conn, host_conf, "same.txt", "same.txt", "diff", "", False)
