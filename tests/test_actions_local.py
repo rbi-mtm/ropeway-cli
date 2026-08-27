@@ -94,6 +94,11 @@ class TestLoadHost:
         with pytest.raises(Exception):
             load_host("any", str(f))
 
+    def test_nonexistent_file(self) -> None:
+        """Non-existent host file raises FileNotFoundError."""
+        with pytest.raises(FileNotFoundError):
+            load_host("any", "/nonexistent/path/hosts.json")
+
 
 class TestCreateTmpFile:
     """Tests for create_tmp_file: creating temporary files."""
@@ -145,6 +150,14 @@ class TestEditFile:
     def test_editor_from_visual_env(self, mocker: MockerFixture) -> None:
         """VISUAL environment variable is preferred when editor is None."""
         mocker.patch.dict(os.environ, {"VISUAL": "nano"}, clear=True)
+        mock_run = mocker.patch("ropeway_cli.lib.actions_local.subprocess.run")
+        path = pathlib.Path("/tmp/test.txt")
+        edit_file(path, editor=None)
+        mock_run.assert_called_once_with(["nano", str(path.absolute())], check=True)
+
+    def test_visual_preferred_over_editor(self, mocker: MockerFixture) -> None:
+        """VISUAL takes precedence over EDITOR when both are set."""
+        mocker.patch.dict(os.environ, {"VISUAL": "nano", "EDITOR": "emacs"}, clear=True)
         mock_run = mocker.patch("ropeway_cli.lib.actions_local.subprocess.run")
         path = pathlib.Path("/tmp/test.txt")
         edit_file(path, editor=None)

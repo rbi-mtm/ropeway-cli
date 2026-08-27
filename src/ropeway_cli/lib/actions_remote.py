@@ -36,6 +36,7 @@ from typing import Any
 
 import fabric
 import invoke
+import rich_click as click
 from rich_click import style
 
 from . import actions_local
@@ -97,14 +98,14 @@ def remote_fetch(
     remote_path = _construct_path(path, host_conf)
 
     if confirm_overwrite and temp_path.exists():
-        print(
+        click.echo(
             style(
                 f"WARNING: local file {temp_path} exists!",
                 fg="red",
                 bg="white",
             )
         )
-        print(f"Overwrite local file: '{temp_path}'? [y/n]")
+        click.echo(f"Overwrite local file: '{temp_path}'? [y/n]")
         resp = input()
         if resp.lower() not in ["y", "yes"]:
             return
@@ -113,7 +114,7 @@ def remote_fetch(
         conn.get(remote_path, str(temp_path.absolute()))
     except FileNotFoundError as exc:
         raise FileNotFoundError(
-            f"ERROR: Could not find file {remote_path} on host {host_conf["hostname"]}"
+            f"ERROR: Could not find file {remote_path} on host {host_conf['hostname']}"
         ) from exc
 
     if not os.path.isfile(temp_path):
@@ -148,14 +149,14 @@ def remote_put(
     remote_path = _construct_path(path, host_conf)
 
     if confirm_overwrite and _file_exists(conn, remote_path):
-        print(
+        click.echo(
             style(
-                f"WARNING: file {remote_path} exists on {host_conf["hostname"]}",
+                f"WARNING: file {remote_path} exists on {host_conf['hostname']}",
                 fg="red",
                 bg="white",
             )
         )
-        print(f"Overwrite remote file: '{remote_path}'? [y/n]")
+        click.echo(f"Overwrite remote file: '{remote_path}'? [y/n]")
         resp = input()
         if resp.lower() not in ["y", "yes"]:
             return
@@ -182,7 +183,7 @@ def ls(conn: fabric.Connection, path: str, host_conf: dict[str, Any], ls_args: s
     """
     path_abs = _construct_path(path, host_conf)
 
-    _run_cmd(conn, f"ls {ls_args} {shlex.quote(path_abs)}", pty=True)
+    _run_cmd(conn, f"ls {shlex.join(shlex.split(ls_args))} {shlex.quote(path_abs)}", pty=True)
 
 
 def mkdir(conn: fabric.Connection, host_conf: dict[str, Any], path: str):
@@ -193,8 +194,7 @@ def mkdir(conn: fabric.Connection, host_conf: dict[str, Any], path: str):
     missing parent directories.
 
     When ``path`` is ``"."``, the basename of the current working directory
-    is used as the directory name and the local working directory is changed
-    to the parent.
+    is used as the directory name.
 
     Args:
         conn: Active Fabric SSH connection to the remote host.
@@ -204,9 +204,9 @@ def mkdir(conn: fabric.Connection, host_conf: dict[str, Any], path: str):
             create a directory with the same name as the current local
             directory.
     """
+
     if path == ".":
         path = os.path.basename(os.getcwd())
-        os.chdir("../")
 
     path_abs = _construct_path(path, host_conf)
     _run_cmd(conn, f"mkdir -p {shlex.quote(path_abs)}")
@@ -246,7 +246,6 @@ def sync_cwd(
     else:
         remote_path = _construct_path(".", host_conf)
 
-    print(local_path, remote_path)
     local_path = str(pathlib.Path(local_path).absolute())
     if not from_remote:
         mkdir(conn, host_conf, remote_path)
@@ -255,7 +254,7 @@ def sync_cwd(
         _rsync(host_conf["hostname"], remote_path, local_path, rsync_args, src_is_remote=True)
 
 
-def _rsync(hostname: str, src: str, dest: str, args: str, src_is_remote: bool = False):
+def _rsync(hostname: str, src: str, dest: str, args: str | None, src_is_remote: bool = False):
     """Synchronize files between local and remote hosts via ``rsync``.
 
     Normalizes the source and destination paths by ensuring trailing
@@ -266,8 +265,7 @@ def _rsync(hostname: str, src: str, dest: str, args: str, src_is_remote: bool = 
         hostname: Remote hostname (or SSH alias) to use.
         src: Source path (local or remote file/directory).
         dest: Destination path (local or remote file/directory).
-        args: Extra arguments passed to the ``rsync`` command
-            (default: ``"-auvzPh --stats"``).
+        args: Extra arguments passed to the ``rsync`` command.
         src_is_remote: If ``True``, treat ``src`` as a remote path;
             otherwise treat ``dest`` as remote (default: ``False``).
     """
@@ -280,8 +278,10 @@ def _rsync(hostname: str, src: str, dest: str, args: str, src_is_remote: bool = 
     else:
         dest = f"{hostname}:{dest}"
 
+    rs_args = shlex.split(args) if args else []
+    click.echo(f"Syncing data from {style(src, fg='green')} to {style(dest, fg='yellow')}")
     subprocess.run(
-        ["rsync"] + shlex.split(args) + ["--", src, dest], check=True
+        ["rsync"] + rs_args + ["--", src, dest], check=True
     )  # "--" prevents src/dest from being interpreted as rsync flags
 
 
@@ -328,22 +328,24 @@ def find(
         match find_cmd:
             case "find":
                 if expr:
-                    print(
+                    click.echo(
                         style(
                             "WARNING: EXPR argument not used with 'find'! Use --args instead!",
                             fg="red",
                             bg="white",
                         )
                     )
-                results = conn.run(f"find . {find_args}", hide=True)
+                results = conn.run(f"find . {shlex.join(shlex.split(find_args))}", hide=True)
             case "fd" | "rust_find":
-                results = conn.run(f"fd {find_args} {expr} .", hide=True)
+                results = conn.run(
+                    f"fd {shlex.join(shlex.split(find_args))} {shlex.quote(expr)} .", hide=True
+                )
             case _:
                 raise NotImplementedError(f"Functionality for {find_cmd} not yet implemented!")
 
     if results.stdout == "":
         return None
-    return results.stdout.split("\n")
+    return results.stdout.splitlines()
 
 
 def realpath(conn: fabric.Connection, host_conf: dict[str, Any], path: str, show_type: bool) -> str:
@@ -423,7 +425,12 @@ def compress(
     """
     remote_path = _construct_path(".", host_conf)
     with conn.cd(remote_path):
-        cmd = f"{cmp_cmd} {cmp_args} {" ".join(files)}"
+        if cmp_args:
+            cmd = " ".join(
+                [shlex.quote(cmp_cmd), shlex.quote(cmp_args), *[shlex.quote(f) for f in files]]
+            )
+        else:
+            cmd = " ".join([shlex.quote(cmp_cmd), *[shlex.quote(f) for f in files]])
         _run_cmd(conn, cmd)
 
 
@@ -449,10 +456,10 @@ def delete_file(conn: fabric.Connection, host_conf: dict[str, Any], path: str):
     if file_type not in ["regular file", "symbolic link", "regular empty file"]:
         raise ValueError("ERROR: Path is not a file or link! Cannot delete it!")
 
-    print(f"Delete remote file: '{remote_path}'? [y/n]")
+    click.echo(f"Delete remote file: '{remote_path}'? [y/n]")
     resp = input()
     if resp.lower() in ["y", "yes"]:
-        print(f"Deleting file {remote_path}")
+        click.echo(f"Deleting file {remote_path}")
         _run_cmd(conn, f"rm {shlex.quote(remote_path)}")
 
 
@@ -495,7 +502,7 @@ def copy(conn: fabric.Connection, host_conf: dict[str, Any], src: str, dest: str
     """
     remote_src = _construct_path(src, host_conf)
     remote_dest = _construct_path(dest, host_conf)
-    print(f"Copy {remote_src} to {remote_dest}")
+    click.echo(f"Copy {remote_src} to {remote_dest}")
     _run_cmd(conn, f"cp {shlex.quote(remote_src)} {shlex.quote(remote_dest)}")
 
 
@@ -537,10 +544,9 @@ def run(conn: fabric.Connection, host_conf: dict[str, Any], cmd: str, directory:
         )
 
     with conn.cd(remote_path):
-        # print(f"Running command on host {host_conf["hostname"]} in {remote_path}: {cmd} ")
-        print(
+        click.echo(
             """Running command on host """
-            f"""{style(host_conf["hostname"], bold=True, fg="blue")}"""
+            f"""{style(host_conf['hostname'], bold=True, fg='blue')}"""
             f""" in {style(remote_path, bold=True, fg=fg_dir)}: {cmd} """
         )
 
@@ -601,7 +607,7 @@ def diff(
         Exit code of the diff command (0 = identical, 1 = different).
     """
     if diff_cmd.strip() != "diff":
-        print(
+        click.echo(
             f"""INFO: Running {diff_cmd} locally, as proper remote function cannot be guaranteed"""
             """for anything other than 'diff'!"""
         )
@@ -614,15 +620,15 @@ def diff(
 
     run_diff = [diff_cmd]
     if diff_args:
-        run_diff.append(diff_args)
+        run_diff.extend(shlex.split(diff_args))
 
     if local:
         tmp_1 = actions_local.create_tmp_file(pathlib.Path(remote_path_1).suffix)
         tmp_2 = actions_local.create_tmp_file(pathlib.Path(remote_path_2).suffix)
 
         try:
-            remote_fetch(conn, host_conf, remote_path_1, tmp_1)
-            remote_fetch(conn, host_conf, remote_path_2, tmp_2)
+            remote_fetch(conn, host_conf, remote_path_1, tmp_1, confirm_overwrite=False)
+            remote_fetch(conn, host_conf, remote_path_2, tmp_2, confirm_overwrite=False)
 
             try:
                 res = subprocess.run(run_diff + [tmp_1, tmp_2], check=False)
@@ -649,7 +655,7 @@ def _diff_local_cleanup(tmp_files: list[pathlib.Path]):
         actions_local.remove_tmp_file(tmp)
 
 
-def _file_exists(conn, remote_path) -> bool:
+def _file_exists(conn: fabric.Connection, remote_path: str) -> bool:
     """Check whether a file exists on the remote host.
 
     Runs ``test -f`` on the remote host to determine if the given path

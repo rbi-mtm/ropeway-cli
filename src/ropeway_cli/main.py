@@ -20,17 +20,12 @@
 
 # pylint: disable=missing-docstring
 
-import sys
-
 from .lib import cli
 
 
 def main():
-
     cli.cli(obj={})  # pylint: disable=no-value-for-parameter
-
-    return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()

@@ -21,6 +21,7 @@
 """CLI definitions for ropeway-cli using rich-click."""
 
 import pathlib
+import shlex
 
 import fabric
 import rich_click as click
@@ -67,6 +68,7 @@ def cli(ctx, host: str):
 
     if ctx.invoked_subcommand is None:
         click.echo(ctx.get_help())
+        return
 
     ctx.ensure_object(dict)
     ctx.obj["host_conf"] = actions_local.load_host(host, HOST_CONFIG)
@@ -220,7 +222,7 @@ def find(ctx, find_cmd, find_args, full_path, show_type, expr):
     shows the file type.
     """
     files = actions_remote.find(
-        ctx.obj["conn"], ctx.obj["host_conf"], find_cmd, f"{find_args}", expr
+        ctx.obj["conn"], ctx.obj["host_conf"], find_cmd, find_args, expr
     )
     if files is None:
         click.echo("No files found!")
@@ -273,8 +275,9 @@ def realpath(ctx, path, show_type):
 @click.option(
     "--only-cwd", "only_cwd", is_flag=True, help="Only compress file in current directory"
 )
+@click.option("--verbose", "verbose", is_flag=True, help="Show more information.")
 @click.pass_context
-def compress(ctx, use, exclude, only_cwd):
+def compress(ctx, use, exclude, only_cwd, verbose):
     """Compress files in a remote directory.
 
     Finds regular files matching the given criteria on the remote host
@@ -289,14 +292,16 @@ def compress(ctx, use, exclude, only_cwd):
             flag = "-a -not -name"
             if e.endswith("/*"):
                 flag = "-a -not -wholename "
-            find_args += flag + f" '{e}' "
-    click.echo(find_args)
+            find_args += flag + " " + shlex.quote(e)
+
+    if verbose:
+        click.echo(find_args)
     files = actions_remote.find(ctx.obj["conn"], ctx.obj["host_conf"], "find", find_args)
 
     if files is not None:
-        files = set(files)
+        files = list(set(files))
         try:
-            actions_remote.compress(ctx.obj["conn"], ctx.obj["host_conf"], use, "-v", files)
+            actions_remote.compress(ctx.obj["conn"], ctx.obj["host_conf"], use, "", files)
         except ValueError as exc:
             click.echo(click.style(exc, fg="red", bg="white"))
 
@@ -380,7 +385,7 @@ def run(ctx, cmd, directory):
         for k in ctx.obj["host_conf"]:
             if k.startswith("@"):
                 click.echo(click.style("-" * 80, bold=True, fg="red"))
-                click.echo(f"{click.style(k, bold=True, fg="blue")}: {ctx.obj["host_conf"][k]}")
+                click.echo(f"{click.style(k, bold=True, fg='blue')}: {ctx.obj['host_conf'][k]}")
         return
 
     try:
@@ -405,18 +410,8 @@ def diff(ctx, diff_cmd, diff_args, local, path_1, path_2):
     By default runs the diff command directly on the remote host.
     Use ``--local`` to download the files to temporary locations and
     compare them locally instead (useful when using a graphical diff tool).
-
-    The exit code is displayed as a message: identical (0),
-    different (1), or an error (other).
     """
 
-    res = actions_remote.diff(
+    actions_remote.diff(
         ctx.obj["conn"], ctx.obj["host_conf"], path_1, path_2, diff_cmd, diff_args, local
     )
-
-    if res == 0:
-        click.echo("Files are identical!")
-    elif res == 1:
-        click.echo("Files are different!")
-    else:
-        click.echo("Some error occurred!")

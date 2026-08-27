@@ -23,6 +23,7 @@
 import json
 import os
 import pathlib
+import shlex
 import subprocess
 import tempfile
 from typing import Any
@@ -130,7 +131,7 @@ def edit_file(path: pathlib.Path, editor: str | None = None):
             os.environ.get("VISUAL") or os.environ.get("EDITOR") or "vim -c 'set backupcopy=yes'"
         )
 
-    subprocess.run([editor, str(path.absolute())], check=True)
+    subprocess.run(shlex.split(editor) + [str(path.absolute())], check=True)
 
 
 def construct_local_path(path: str, host_conf: dict[str, Any]) -> pathlib.Path:

@@ -178,7 +178,6 @@ class TestRemoteFetch:
         """User declines overwrite: conn.get is not called."""
         mocker.patch("ropeway_cli.lib.actions_remote.os.path.isfile", return_value=True)
         mocker.patch("builtins.input", return_value="n")
-        mocker.patch("builtins.print")
         dest = tmp_path / "existing.txt"
         dest.write_text("old content")
         remote_fetch(mock_conn, host_conf, "/home/user/project/file.txt", dest)
@@ -194,7 +193,23 @@ class TestRemoteFetch:
         """User accepts overwrite: conn.get proceeds."""
         mocker.patch("ropeway_cli.lib.actions_remote.os.path.isfile", return_value=True)
         mocker.patch("builtins.input", return_value="y")
-        mocker.patch("builtins.print")
+        dest = tmp_path / "existing.txt"
+        dest.write_text("old content")
+        remote_fetch(mock_conn, host_conf, "/home/user/project/file.txt", dest)
+        mock_conn.get.assert_called_once()
+
+    @pytest.mark.parametrize("answer", ["yes", "YES", "Yes"])
+    def test_fetch_overwrite_accepted_yes(
+        self,
+        mocker: MockerFixture,
+        mock_conn: Any,
+        host_conf: dict[str, str],
+        tmp_path: Path,
+        answer: str,
+    ) -> None:
+        """User types 'yes' (any case): conn.get proceeds."""
+        mocker.patch("ropeway_cli.lib.actions_remote.os.path.isfile", return_value=True)
+        mocker.patch("builtins.input", return_value=answer)
         dest = tmp_path / "existing.txt"
         dest.write_text("old content")
         remote_fetch(mock_conn, host_conf, "/home/user/project/file.txt", dest)
@@ -210,7 +225,6 @@ class TestRemoteFetch:
         """confirm_overwrite=False skips the prompt even if file exists."""
         mocker.patch("ropeway_cli.lib.actions_remote.os.path.isfile", return_value=True)
         mock_input = mocker.patch("builtins.input")
-        mocker.patch("builtins.print")
         dest = tmp_path / "existing.txt"
         dest.write_text("old content")
         remote_fetch(
@@ -260,7 +274,6 @@ class TestRemotePut:
         """User declines overwrite: conn.put is not called."""
         mocker.patch("ropeway_cli.lib.actions_remote._file_exists", return_value=True)
         mocker.patch("builtins.input", return_value="n")
-        mocker.patch("builtins.print")
         src = tmp_path / "local.txt"
         remote_put(mock_conn, host_conf, "/home/user/project/remote.txt", src)
         mock_conn.put.assert_not_called()
@@ -275,7 +288,22 @@ class TestRemotePut:
         """User accepts overwrite: conn.put proceeds."""
         mocker.patch("ropeway_cli.lib.actions_remote._file_exists", return_value=True)
         mocker.patch("builtins.input", return_value="y")
-        mocker.patch("builtins.print")
+        src = tmp_path / "local.txt"
+        remote_put(mock_conn, host_conf, "/home/user/project/remote.txt", src)
+        mock_conn.put.assert_called_once()
+
+    @pytest.mark.parametrize("answer", ["yes", "YES", "Yes"])
+    def test_put_overwrite_accepted_yes(
+        self,
+        mocker: MockerFixture,
+        mock_conn: Any,
+        host_conf: dict[str, str],
+        tmp_path: Path,
+        answer: str,
+    ) -> None:
+        """User types 'yes' (any case): conn.put proceeds."""
+        mocker.patch("ropeway_cli.lib.actions_remote._file_exists", return_value=True)
+        mocker.patch("builtins.input", return_value=answer)
         src = tmp_path / "local.txt"
         remote_put(mock_conn, host_conf, "/home/user/project/remote.txt", src)
         mock_conn.put.assert_called_once()
@@ -315,7 +343,6 @@ class TestLs:
     ) -> None:
         """ls propagates ValueError from _run_cmd on non-zero exit."""
         mock_conn.run.return_value.exited = 2
-        mocker.patch("builtins.print")
         with pytest.raises(ValueError, match="terminated with exit code 2"):
             ls(mock_conn, "/home/user/project", host_conf, "-lAh")
         mock_conn.run.assert_called_once_with(
@@ -341,7 +368,6 @@ class TestMkdir:
     ) -> None:
         """The '.' special case uses basename(CWD) as the directory name and chdirs to parent."""
         mocker.patch("ropeway_cli.lib.actions_remote.os.getcwd", return_value="/home/user/project/sub")
-        mocker.patch("ropeway_cli.lib.actions_remote.os.chdir")
         mocker.patch(
             "ropeway_cli.lib.actions_remote._construct_path",
             return_value="/remote/home/user/project/sub",
@@ -359,7 +385,6 @@ class TestMkdir:
     ) -> None:
         """mkdir propagates ValueError from _run_cmd on non-zero exit."""
         mock_conn.run.return_value.exited = 1
-        mocker.patch("builtins.print")
         with pytest.raises(ValueError, match="terminated with exit code 1"):
             mkdir(mock_conn, host_conf, "/home/user/project/newdir")
         mock_conn.run.assert_called_once_with(
@@ -395,6 +420,14 @@ class TestRsync:
         mock_subprocess.side_effect = subprocess.CalledProcessError(1, ["rsync"])
         with pytest.raises(subprocess.CalledProcessError):
             _rsync("myhost", "/local/path", "/remote/path", "-auvz")
+
+    @pytest.mark.parametrize("args", ["", None])
+    def test_rsync_no_extra_args(self, mocker: MockerFixture, args: str | None) -> None:
+        """Empty or None args produce no extra rsync arguments."""
+        mock_subprocess = mocker.patch("ropeway_cli.lib.actions_remote.subprocess.run")
+        _rsync("myhost", "/local/path", "/remote/path", args)
+        cmd = mock_subprocess.call_args[0][0]
+        assert cmd == ["rsync", "--", "/local/path/", "myhost:/remote/path/"]
 
 
 class TestSyncCwd:
@@ -488,7 +521,7 @@ class TestFind:
         mocker.patch("ropeway_cli.lib.actions_remote._construct_path", return_value="/remote/root")
         mock_conn.run.return_value.stdout = "file1.py\nfile2.py\n"
         result = find(mock_conn, host_conf, "find", "-name '*.py'")
-        assert result == ["file1.py", "file2.py", ""]
+        assert result == ["file1.py", "file2.py"]
         mock_conn.run.assert_called_once_with("find . -name '*.py'", hide=True)
 
     @pytest.mark.parametrize("backend", ["fd", "rust_find"])
@@ -503,8 +536,8 @@ class TestFind:
         mocker.patch("ropeway_cli.lib.actions_remote._construct_path", return_value="/remote/root")
         mock_conn.run.return_value.stdout = "a.py\nb.py\n"
         result = find(mock_conn, host_conf, backend, "-e py", expr="")
-        assert result == ["a.py", "b.py", ""]
-        mock_conn.run.assert_called_once_with("fd -e py  .", hide=True)
+        assert result == ["a.py", "b.py"]
+        mock_conn.run.assert_called_once_with("fd -e py '' .", hide=True)
 
     def test_find_no_results(
         self,
@@ -527,12 +560,12 @@ class TestFind:
     ) -> None:
         """Non-empty expr with 'find' backend prints a warning (expr is ignored)."""
         mocker.patch("ropeway_cli.lib.actions_remote._construct_path", return_value="/remote/root")
-        mock_print = mocker.patch("builtins.print")
+        mock_echo = mocker.patch("ropeway_cli.lib.actions_remote.click.echo")
         mock_conn.run.return_value.stdout = "some/file.py\n"
         result = find(mock_conn, host_conf, "find", "-name '*.py'", expr="*.py")
-        assert result == ["some/file.py", ""]
-        mock_print.assert_called_once()
-        printed_msg = mock_print.call_args[0][0]
+        assert result == ["some/file.py"]
+        mock_echo.assert_called_once()
+        printed_msg = mock_echo.call_args[0][0]
         assert "EXPR argument not used with 'find'" in printed_msg
 
     def test_find_not_implemented(
@@ -642,18 +675,27 @@ class TestCompress:
         mock_conn: Any,
         host_conf: dict[str, str],
     ) -> None:
-        """Empty cmp_args produces a command with extra whitespace but runs."""
+        """Empty cmp_args produces a command with no extra whitespace."""
         compress(mock_conn, host_conf, "bzip2", "", ["file.dat"])
-        mock_conn.run.assert_called_once_with("bzip2  file.dat", warn=True, pty=False)
+        mock_conn.run.assert_called_once_with("bzip2 file.dat", warn=True, pty=False)
+
+    def test_compress_whitespace_args(
+        self,
+        mock_conn: Any,
+        host_conf: dict[str, str],
+    ) -> None:
+        """Whitespace-only cmp_args is treated as non-empty and quoted."""
+        compress(mock_conn, host_conf, "bzip2", "  ", ["file.dat"])
+        mock_conn.run.assert_called_once_with("bzip2 '  ' file.dat", warn=True, pty=False)
 
     def test_compress_empty_files(
         self,
         mock_conn: Any,
         host_conf: dict[str, str],
     ) -> None:
-        """Empty files list produces a trailing-space command but runs."""
+        """Empty files list produces a command with only the compressor and args."""
         compress(mock_conn, host_conf, "bzip2", "-v", [])
-        mock_conn.run.assert_called_once_with("bzip2 -v ", warn=True, pty=False)
+        mock_conn.run.assert_called_once_with("bzip2 -v", warn=True, pty=False)
 
 
 class TestDeleteFile:
@@ -673,7 +715,23 @@ class TestDeleteFile:
         """File and link types are confirmed and deleted: stat then rm."""
         mock_conn.run.return_value.stdout = f"{file_type}\n"
         mocker.patch("builtins.input", return_value="y")
-        mocker.patch("builtins.print")
+        delete_file(mock_conn, host_conf, "/home/user/project/file.txt")
+        assert mock_conn.run.mock_calls == [
+            mocker.call("stat -c %F /remote/home/user/project/file.txt", hide=True),
+            mocker.call("rm /remote/home/user/project/file.txt", warn=True, pty=False),
+        ]
+
+    @pytest.mark.parametrize("answer", ["yes", "YES", "Yes"])
+    def test_delete_confirmed_yes(
+        self,
+        mocker: MockerFixture,
+        mock_conn: Any,
+        host_conf: dict[str, str],
+        answer: str,
+    ) -> None:
+        """User types 'yes' (any case): file is deleted."""
+        mock_conn.run.return_value.stdout = "regular file\n"
+        mocker.patch("builtins.input", return_value=answer)
         delete_file(mock_conn, host_conf, "/home/user/project/file.txt")
         assert mock_conn.run.mock_calls == [
             mocker.call("stat -c %F /remote/home/user/project/file.txt", hide=True),
@@ -689,7 +747,6 @@ class TestDeleteFile:
         """User declines deletion: only stat is called, no rm."""
         mock_conn.run.return_value.stdout = "regular file\n"
         mocker.patch("builtins.input", return_value="n")
-        mocker.patch("builtins.print")
         delete_file(mock_conn, host_conf, "/home/user/project/file.txt")
         mock_conn.run.assert_called_once_with(
             "stat -c %F /remote/home/user/project/file.txt", hide=True
@@ -714,7 +771,6 @@ class TestDeleteFile:
         """rm command failure raises UnexpectedExit."""
         mock_conn.run.return_value.stdout = "regular file\n"
         mocker.patch("builtins.input", return_value="y")
-        mocker.patch("builtins.print")
         mock_conn.run.side_effect = [mocker.DEFAULT, invoke.exceptions.UnexpectedExit(None)]
         with pytest.raises(invoke.exceptions.UnexpectedExit):
             delete_file(mock_conn, host_conf, "/home/user/project/file.txt")
@@ -776,7 +832,6 @@ class TestCopy:
         mocker: MockerFixture,
     ) -> None:
         """Both source and destination paths are translated before the cp call."""
-        mocker.patch("builtins.print")
         remote_copy(
             mock_conn,
             host_conf,
@@ -796,7 +851,6 @@ class TestCopy:
         mocker: MockerFixture,
     ) -> None:
         """UnexpectedExit from conn.run is propagated."""
-        mocker.patch("builtins.print")
         mock_conn.run.side_effect = invoke.exceptions.UnexpectedExit(None)
         with pytest.raises(invoke.exceptions.UnexpectedExit):
             remote_copy(
@@ -857,7 +911,6 @@ class TestRun:
         """UnexpectedExit from command execution is propagated."""
         mock_conn.run.return_value.stdout = "directory\n"
         mock_conn.run.side_effect = [mocker.DEFAULT, invoke.exceptions.UnexpectedExit(None)]
-        mocker.patch("builtins.print")
         with pytest.raises(invoke.exceptions.UnexpectedExit):
             remote_run(mock_conn, host_conf, "echo hello", "/home/user/project")
 
@@ -1029,7 +1082,6 @@ class TestDiff:
             "ropeway_cli.lib.actions_remote._construct_path",
             side_effect=["/remote/a.txt", "/remote/b.txt"],
         )
-        mocker.patch("builtins.print")
         tmp_a = tmp_path / "refops_a.txt"
         tmp_b = tmp_path / "refops_b.txt"
         mocker.patch("ropeway_cli.lib.actions_local.create_tmp_file", side_effect=[tmp_a, tmp_b])

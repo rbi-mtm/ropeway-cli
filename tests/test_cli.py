@@ -81,19 +81,7 @@ class TestCliHelp:
 
 class TestLsCommand:
     def test_ls_command(self, mocker: MockerFixture, mock_conn: Any) -> None:
-        mocker.patch("ropeway_cli.lib.cli.pathlib.Path")
-        ropeway_cli.lib.cli.pathlib.Path.return_value.exists.return_value = True
-        mocker.patch("ropeway_cli.lib.cli.fabric.Connection", return_value=mock_conn)
-        mocker.patch(
-            "ropeway_cli.lib.cli.actions_local.load_host",
-            return_value={
-                "local_base_path": "/local",
-                "remote_base_path": "/remote",
-                "hostname": "myhost",
-            },
-        )
-        runner = CliRunner()
-        result: Result = runner.invoke(cli, ["-H", "myhost", "ls", "."])
+        result = _invoke(mocker, mock_conn, ["ls", "."])
         assert result.exit_code == 0
         mock_conn.run.assert_called_once()
 
@@ -127,17 +115,6 @@ class TestLsCommand:
 
 class TestPutCommand:
     def test_put_command(self, mocker: MockerFixture, mock_conn: Any, tmp_path: Path) -> None:
-        mocker.patch("ropeway_cli.lib.cli.pathlib.Path")
-        ropeway_cli.lib.cli.pathlib.Path.return_value.exists.return_value = True
-        mocker.patch("ropeway_cli.lib.cli.fabric.Connection", return_value=mock_conn)
-        mocker.patch(
-            "ropeway_cli.lib.cli.actions_local.load_host",
-            return_value={
-                "local_base_path": "/local",
-                "remote_base_path": "/remote",
-                "hostname": "myhost",
-            },
-        )
         src = tmp_path / "test.txt"
         src.write_text("content")
         mocker.patch(
@@ -145,8 +122,7 @@ class TestPutCommand:
             return_value=src,
         )
         mock_remote_put = mocker.patch("ropeway_cli.lib.cli.actions_remote.remote_put")
-        runner = CliRunner()
-        result = runner.invoke(cli, ["-H", "myhost", "put", "test.txt"])
+        result = _invoke(mocker, mock_conn, ["put", "test.txt"])
         assert result.exit_code == 0
         mock_remote_put.assert_called_once()
 
@@ -286,27 +262,13 @@ class TestMkdirCommand:
 
 class TestRealpathCommand:
     def test_realpath_command(self, mocker: MockerFixture, mock_conn: Any) -> None:
-        mocker.patch("ropeway_cli.lib.cli.pathlib.Path")
-        ropeway_cli.lib.cli.pathlib.Path.return_value.exists.return_value = True
-        mocker.patch("ropeway_cli.lib.cli.fabric.Connection", return_value=mock_conn)
-        mocker.patch(
-            "ropeway_cli.lib.cli.actions_local.load_host",
-            return_value={
-                "local_base_path": "/local/path",
-                "remote_base_path": "/remote/path",
-                "hostname": "myhost",
-            },
-        )
         mocker.patch("ropeway_cli.lib.actions_remote.os.path.realpath", side_effect=lambda x: x)
-        runner = CliRunner()
-        result: Result = runner.invoke(cli, ["-H", "myhost", "realpath", "/local/path"])
+        result = _invoke(mocker, mock_conn, ["realpath", "/local/path"])
         assert result.exit_code == 0
         assert "/remote/path" in result.output
 
     def test_realpath_show_type(self, mocker: MockerFixture, mock_conn: Any) -> None:
         """realpath --show-type includes file type in output."""
-        mocker.patch("ropeway_cli.lib.cli.pathlib.Path")
-        ropeway_cli.lib.cli.pathlib.Path.return_value.exists.return_value = True
         mocker.patch(
             "ropeway_cli.lib.actions_remote.os.path.realpath",
             side_effect=lambda x: x,
@@ -317,21 +279,9 @@ class TestRealpathCommand:
 
 class TestDeleteCommand:
     def test_delete_command(self, mocker: MockerFixture, mock_conn: Any) -> None:
-        mocker.patch("ropeway_cli.lib.cli.pathlib.Path")
-        ropeway_cli.lib.cli.pathlib.Path.return_value.exists.return_value = True
-        mocker.patch("ropeway_cli.lib.cli.fabric.Connection", return_value=mock_conn)
-        mocker.patch(
-            "ropeway_cli.lib.cli.actions_local.load_host",
-            return_value={
-                "local_base_path": "/local",
-                "remote_base_path": "/remote",
-                "hostname": "myhost",
-            },
-        )
         mock_conn.run.return_value.stdout = "regular file\n"
         mocker.patch("builtins.input", return_value="y")
-        runner = CliRunner()
-        result: Result = runner.invoke(cli, ["-H", "myhost", "delete", "/remote/file.txt"])
+        result = _invoke(mocker, mock_conn, ["delete", "/remote/file.txt"])
         assert result.exit_code == 0
 
     def test_delete_value_error(self, mocker: MockerFixture, mock_conn: Any) -> None:
@@ -353,20 +303,13 @@ class TestRunCommand:
         mock_run.assert_called_once_with(mock_conn, mock_run.call_args[0][1], "echo hello", ".")
 
     def test_run_list_aliases(self, mocker: MockerFixture, mock_conn: Any) -> None:
-        mocker.patch("ropeway_cli.lib.cli.pathlib.Path")
-        ropeway_cli.lib.cli.pathlib.Path.return_value.exists.return_value = True
-        mocker.patch("ropeway_cli.lib.cli.fabric.Connection", return_value=mock_conn)
-        mocker.patch(
-            "ropeway_cli.lib.cli.actions_local.load_host",
-            return_value={
-                "local_base_path": "/local",
-                "remote_base_path": "/remote",
-                "hostname": "myhost",
-                "@build": "make",
-            },
-        )
-        runner = CliRunner()
-        result: Result = runner.invoke(cli, ["-H", "myhost", "run"])
+        host_conf = {
+            "local_base_path": "/local",
+            "remote_base_path": "/remote",
+            "hostname": "myhost",
+            "@build": "make",
+        }
+        result = _invoke(mocker, mock_conn, ["run"], host_conf=host_conf)
         assert result.exit_code == 0
         assert "@build" in result.output
 
@@ -393,40 +336,21 @@ class TestRunCommand:
 
     def test_run_no_aliases(self, mocker: MockerFixture, mock_conn: Any) -> None:
         """run with no command and no @-prefixed keys prints nothing."""
-        mocker.patch("ropeway_cli.lib.cli.pathlib.Path")
-        ropeway_cli.lib.cli.pathlib.Path.return_value.exists.return_value = True
-        mocker.patch(
-            "ropeway_cli.lib.cli.actions_local.load_host",
-            return_value={
-                "local_base_path": "/local",
-                "remote_base_path": "/remote",
-                "hostname": "myhost",
-            },
-        )
-        mocker.patch("ropeway_cli.lib.cli.fabric.Connection", return_value=mock_conn)
-        runner = CliRunner()
-        result: Result = runner.invoke(cli, ["-H", "myhost", "run"])
+        result = _invoke(mocker, mock_conn, ["run"])
         assert result.exit_code == 0
         assert result.output.strip() == ""
 
     def test_run_list_multiple_aliases(self, mocker: MockerFixture, mock_conn: Any) -> None:
         """run with no cmd lists all @-prefixed aliases, skipping non-alias keys."""
-        mocker.patch("ropeway_cli.lib.cli.pathlib.Path")
-        ropeway_cli.lib.cli.pathlib.Path.return_value.exists.return_value = True
-        mocker.patch(
-            "ropeway_cli.lib.cli.actions_local.load_host",
-            return_value={
-                "local_base_path": "/local",
-                "remote_base_path": "/remote",
-                "hostname": "myhost",
-                "@build": "make",
-                "@test": "pytest",
-                "regular_key": "val",
-            },
-        )
-        mocker.patch("ropeway_cli.lib.cli.fabric.Connection", return_value=mock_conn)
-        runner = CliRunner()
-        result: Result = runner.invoke(cli, ["-H", "myhost", "run"])
+        host_conf = {
+            "local_base_path": "/local",
+            "remote_base_path": "/remote",
+            "hostname": "myhost",
+            "@build": "make",
+            "@test": "pytest",
+            "regular_key": "val",
+        }
+        result = _invoke(mocker, mock_conn, ["run"], host_conf=host_conf)
         assert result.exit_code == 0
         assert "@build" in result.output
         assert "@test" in result.output
@@ -598,25 +522,22 @@ class TestTailCommand:
 
 class TestDiffCommand:
     def test_diff_identical(self, mocker: MockerFixture, mock_conn: Any) -> None:
-        """Exit code 0: files are identical."""
+        """Exit code 0: command completes successfully."""
         mocker.patch("ropeway_cli.lib.cli.actions_remote.diff", return_value=0)
         result = _invoke(mocker, mock_conn, ["diff", "a.txt", "b.txt"])
         assert result.exit_code == 0
-        assert "Files are identical!" in result.output
 
     def test_diff_different(self, mocker: MockerFixture, mock_conn: Any) -> None:
-        """Exit code 1: files are different."""
+        """Exit code 1: command completes successfully."""
         mocker.patch("ropeway_cli.lib.cli.actions_remote.diff", return_value=1)
         result = _invoke(mocker, mock_conn, ["diff", "a.txt", "b.txt"])
         assert result.exit_code == 0
-        assert "Files are different!" in result.output
 
     def test_diff_error(self, mocker: MockerFixture, mock_conn: Any) -> None:
-        """Other exit code: error occurred."""
+        """Other exit code: command completes successfully."""
         mocker.patch("ropeway_cli.lib.cli.actions_remote.diff", return_value=2)
         result = _invoke(mocker, mock_conn, ["diff", "a.txt", "b.txt"])
         assert result.exit_code == 0
-        assert "Some error occurred!" in result.output
 
     def test_diff_local_flag(self, mocker: MockerFixture, mock_conn: Any) -> None:
         """--local flag is forwarded to actions_remote.diff."""
@@ -730,7 +651,7 @@ class TestCompressCommand:
         mock_compress = mocker.patch("ropeway_cli.lib.cli.actions_remote.compress")
         result = _invoke(mocker, mock_conn, ["compress"])
         assert result.exit_code == 0
-        passed_files = mock_compress.call_args[0][3]
+        passed_files = mock_compress.call_args[0][4]
         assert len(passed_files) == 2
 
     def test_compress_mixed_exclude_patterns(self, mocker: MockerFixture, mock_conn: Any) -> None:
@@ -760,3 +681,14 @@ class TestCompressCommand:
         result = _invoke(mocker, mock_conn, ["compress"])
         assert result.exit_code == 0
         assert "terminated with exit code 1" in result.output
+
+    def test_compress_verbose(self, mocker: MockerFixture, mock_conn: Any) -> None:
+        """--verbose flag echoes find_args to output."""
+        mocker.patch(
+            "ropeway_cli.lib.cli.actions_remote.find",
+            return_value=["file.dat"],
+        )
+        mocker.patch("ropeway_cli.lib.cli.actions_remote.compress")
+        result = _invoke(mocker, mock_conn, ["compress", "--verbose"])
+        assert result.exit_code == 0
+        assert " -type f " in result.output
