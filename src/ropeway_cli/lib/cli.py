@@ -2,7 +2,7 @@
 # Copyright (c) 2026 bernik86.
 #
 # This file is part of ropeway-cli
-# (see https://github.com/bernik86/ropeway-cli).
+# (see https://github.com/rbi-mtm/ropeway-cli).
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -221,9 +221,7 @@ def find(ctx, find_cmd, find_args, full_path, show_type, expr):
     and displays matching paths. Optionally resolves full paths and
     shows the file type.
     """
-    files = actions_remote.find(
-        ctx.obj["conn"], ctx.obj["host_conf"], find_cmd, find_args, expr
-    )
+    files = actions_remote.find(ctx.obj["conn"], ctx.obj["host_conf"], find_cmd, find_args, expr)
     if files is None:
         click.echo("No files found!")
         return

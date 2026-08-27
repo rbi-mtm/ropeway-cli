@@ -14,7 +14,7 @@ convenient Click-based interface for common remote file tasks.
 - **get** / **put** — Download / upload files
 - **mkdir** — Create remote directories
 - **sync_cwd** — Bidirectional `rsync` between current directory and remote
-- **find** — Search for files on the remote host (uses [fd](https://github.com/sharkdp/fd) by default; falls back to `find`)
+- **find** — Search for files on the remote host (uses [fd](https://github.com/sharkdp/fd) by default; switch with `--use find` or `--use rust_find`)
 - **realpath** — Resolve the absolute path of a remote file
 - **compress** — Compress remote files (bzip2, gzip, etc.)
 - **delete** — Remove a remote file (with confirmation)
@@ -31,7 +31,7 @@ from source.
 ### Using `uv` (recommended)
 
 ```bash
-git clone https://github.com/bernik86/ropeway-cli.git
+git clone https://github.com/rbi-mtm/ropeway-cli.git
 cd ropeway-cli
 uv venv
 source .venv/bin/activate
@@ -41,7 +41,7 @@ uv pip install .
 ### Using `pip`
 
 ```bash
-git clone https://github.com/bernik86/ropeway-cli.git
+git clone https://github.com/rbi-mtm/ropeway-cli.git
 cd ropeway-cli
 python3 -m venv .venv
 source .venv/bin/activate
@@ -93,14 +93,14 @@ The `-H` / `--host` flag is **required** and must match a key in
 | `put PATH` | Upload a local file. `--overwrite` to skip confirmation |
 | `mkdir [PATH]` | Create a directory on the remote host |
 | `sync_cwd` | Sync current directory via `rsync`. `--args` for rsync flags, `--from` for remote→local |
-| `find [EXPR]` | Search files via `fd` or `find`. `--use`, `--args`, `--full-path`, `--show-type` |
+| `find [EXPR]` | Search files via `fd` / `rust_find` or `find`. `--use`, `--args`, `--full-path`, `--show-type`. `EXPR` is only used by fd/rust_find |
 | `realpath PATH` | Resolve absolute remote path. `--show-type` to prefix file type |
-| `compress` | Compress files remotely. `--use` (compressor), `--exclude` (patterns), `--only-cwd` |
+| `compress` | Compress files remotely. `--use` (compressor), `--exclude` (patterns), `--only-cwd`, `--verbose` |
 | `delete PATH` | Delete a remote file (prompts for confirmation) |
 | `tail FILENAME` | Tail a remote file. `-f` for follow mode |
 | `cp SRC DEST` | Copy a file on the remote machine |
 | `diff PATH_1 PATH_2` | Compare two remote files. `--use` (diff tool), `--args`, `--local` (download and diff locally) |
-| `run CMD` | Run an arbitrary command or `@alias` on the remote host. `-D` / `--directory` to set working dir (overridden by alias directory if specified) |
+| `run [CMD]` | Run an arbitrary command or `@alias` on the remote host. `-D` / `--directory` to set working dir (overridden by alias directory if specified). No CMD lists all configured `@aliases` |
 
 ### Examples
 
@@ -151,6 +151,9 @@ ropeway-cli -H mycluster run "ls -la /tmp"
 ropeway-cli -H mycluster run @mycommand
 ropeway-cli -H mycluster run @build
 
+# List all configured aliases
+ropeway-cli -H mycluster run
+
 # Compare two remote files (default: remote diff)
 ropeway-cli -H mycluster diff /remote/path/a.txt /remote/path/b.txt
 
@@ -160,6 +163,21 @@ ropeway-cli -H mycluster diff /remote/path/a.txt /remote/path/b.txt --use vimdif
 # Download and compare locally
 ropeway-cli -H mycluster diff /remote/path/a.txt /remote/path/b.txt --local
 ```
+
+### Shell convenience function
+
+Since `-H` / `--host` must be specified on every invocation, you can
+define a shell function that pins the host:
+
+```bash
+rcl ()
+{
+   ropeway-cli -H mycluster "$@"
+}
+```
+
+After that, simply run `rcl <command> [options]` instead of
+`ropeway-cli -H mycluster <command> [options]`.
 
 ## Path Mapping
 
@@ -181,7 +199,7 @@ Pull requests are welcome. New contributions should include proper tests.
 ### Setup
 
 ```bash
-git clone https://github.com/bernik86/ropeway-cli.git
+git clone https://github.com/rbi-mtm/ropeway-cli.git
 cd ropeway-cli
 uv venv
 uv pip install -e '.[dev]'
@@ -203,8 +221,6 @@ uv run pytest -v --cov --cov-report=term-missing
 ```
 
 ## License
-
-Copyright (C) 2026 Berni
 
 This program is free software; you can redistribute it and/or modify it
 under the terms of the GNU General Public License as published by the

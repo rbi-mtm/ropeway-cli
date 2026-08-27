@@ -2,7 +2,7 @@
 # Copyright (c) 2026 bernik86.
 #
 # This file is part of ropeway-cli
-# (see https://github.com/bernik86/ropeway-cli).
+# (see https://github.com/rbi-mtm/ropeway-cli).
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -367,7 +367,9 @@ class TestMkdir:
         host_conf: dict[str, str],
     ) -> None:
         """The '.' special case uses basename(CWD) as the directory name and chdirs to parent."""
-        mocker.patch("ropeway_cli.lib.actions_remote.os.getcwd", return_value="/home/user/project/sub")
+        mocker.patch(
+            "ropeway_cli.lib.actions_remote.os.getcwd", return_value="/home/user/project/sub"
+        )
         mocker.patch(
             "ropeway_cli.lib.actions_remote._construct_path",
             return_value="/remote/home/user/project/sub",
@@ -473,7 +475,9 @@ class TestSyncCwd:
         host_conf: dict[str, str],
     ) -> None:
         """Push from a subdirectory: _construct_path translates '.' to the remote equivalent."""
-        mocker.patch("ropeway_cli.lib.actions_remote.os.getcwd", return_value="/home/user/project/sub")
+        mocker.patch(
+            "ropeway_cli.lib.actions_remote.os.getcwd", return_value="/home/user/project/sub"
+        )
         mock_rsync = mocker.patch("ropeway_cli.lib.actions_remote._rsync")
         mocker.patch("ropeway_cli.lib.actions_remote.mkdir")
         mocker.patch(
@@ -492,7 +496,9 @@ class TestSyncCwd:
         host_conf: dict[str, str],
     ) -> None:
         """Pull from a subdirectory: uses _construct_path and skips mkdir."""
-        mocker.patch("ropeway_cli.lib.actions_remote.os.getcwd", return_value="/home/user/project/sub")
+        mocker.patch(
+            "ropeway_cli.lib.actions_remote.os.getcwd", return_value="/home/user/project/sub"
+        )
         mock_rsync = mocker.patch("ropeway_cli.lib.actions_remote._rsync")
         mocker.patch(
             "ropeway_cli.lib.actions_remote._construct_path",

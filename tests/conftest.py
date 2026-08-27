@@ -2,7 +2,7 @@
 # Copyright (c) 2026 bernik86.
 #
 # This file is part of ropeway-cli
-# (see https://github.com/bernik86/ropeway-cli).
+# (see https://github.com/rbi-mtm/ropeway-cli).
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by

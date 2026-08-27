@@ -1,7 +1,7 @@
 [project]
 name = "ropeway-cli"
-version = "0.1.0"
-description = "Remote file operations over SSH via a ropeway metaphor — a CLI tool for transferring, syncing, and managing remote files"
+version = "1.0.0"
+description = "Ropeway-cli is a CLI tool for transferring, syncing, and managing remote files via SSH."
 readme = "README.md"
 authors = [
     { name = "bernik86", email = "44434852+bernik86@users.noreply.github.com" }
@@ -26,6 +26,11 @@ dev = [
     "pytest-mock>=3.0",
     "pytest-cov>=6.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/rbi-mtm/ropeway-cli"
+Repository = "https://github.com/rbi-mtm/ropeway-cli"
+Issues = "https://github.com/rbi-mtm/ropeway-cli/issues"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
