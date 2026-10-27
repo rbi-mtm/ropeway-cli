@@ -1,6 +1,6 @@
 [project]
 name = "ropeway-cli"
-version = "1.0.0"
+version = "1.1.0"
 description = "Ropeway-cli is a CLI tool for transferring, syncing, and managing remote files via SSH."
 readme = "README.md"
 authors = [

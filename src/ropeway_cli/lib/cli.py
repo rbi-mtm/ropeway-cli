@@ -136,38 +136,46 @@ def view(ctx, path, editor, write, new):
 
 @cli.command(short_help="Copy remote file to local machine.")
 @click.option("--overwrite", "overwrite", is_flag=True, help="Overwrite local file without asking.")
-@click.argument("filename")
+@click.argument("filenames", nargs=-1)
 @click.pass_context
-def get(ctx, filename, overwrite):
+def get(ctx, filenames, overwrite):
     """Download a remote file to the local machine.
 
     Translates the remote filename to a corresponding local path using the
     host configuration and downloads the file.
     """
-    local_path = actions_local.construct_local_path(filename, ctx.obj["host_conf"])
-    actions_remote.remote_fetch(
-        ctx.obj["conn"], ctx.obj["host_conf"], filename, local_path, confirm_overwrite=not overwrite
-    )
+    for filename in filenames:
+        local_path = actions_local.construct_local_path(filename, ctx.obj["host_conf"])
+        actions_remote.remote_fetch(
+            ctx.obj["conn"],
+            ctx.obj["host_conf"],
+            filename,
+            local_path,
+            confirm_overwrite=not overwrite,
+        )
 
 
 @cli.command(short_help="Copy local file to remote machine.")
 @click.option(
     "--overwrite", "overwrite", is_flag=True, help="Overwrite remote file without asking."
 )
-@click.argument(
-    "filename",
-)
+@click.argument("filenames", nargs=-1)
 @click.pass_context
-def put(ctx, filename, overwrite):
+def put(ctx, filenames, overwrite):
     """Upload a local file to the remote machine.
 
     Translates the local filename to a corresponding remote path using the
     host configuration and uploads the file.
     """
-    local_path = actions_local.construct_local_path(filename, ctx.obj["host_conf"])
-    actions_remote.remote_put(
-        ctx.obj["conn"], ctx.obj["host_conf"], filename, local_path, confirm_overwrite=not overwrite
-    )
+    for filename in filenames:
+        local_path = actions_local.construct_local_path(filename, ctx.obj["host_conf"])
+        actions_remote.remote_put(
+            ctx.obj["conn"],
+            ctx.obj["host_conf"],
+            filename,
+            local_path,
+            confirm_overwrite=not overwrite,
+        )
 
 
 @cli.command(short_help="Make directory on remote host")
